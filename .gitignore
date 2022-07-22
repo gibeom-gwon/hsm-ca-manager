@@ -1,0 +1,4 @@
+*.o
+*.der
+*.pem
+gen_ca_cert
