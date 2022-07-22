@@ -1,4 +1,5 @@
 *.o
 *.der
 *.pem
+*.csr
 gen_root_ca_cert
