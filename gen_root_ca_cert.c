@@ -135,7 +135,7 @@ int main()
 	if(!X509_sign(cert,privkey,EVP_sha256()))
 		goto fail;
 
-	FILE *f = fopen("cert.der","wb");
+	FILE *f = fopen("root_ca.der","wb");
 	if(!f)
 		goto fail;
 	if(!i2d_X509_fp(f,cert))
@@ -145,7 +145,7 @@ int main()
 	}
 	fclose(f);
 
-	f = fopen("cert.pem","wb");
+	f = fopen("root_ca.pem","wb");
 	if(!f)
 		goto fail;
 	if(!PEM_write_X509(f,cert))

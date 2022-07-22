@@ -1,4 +1,4 @@
 *.o
 *.der
 *.pem
-gen_ca_cert
+gen_root_ca_cert
