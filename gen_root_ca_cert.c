@@ -31,7 +31,7 @@ int main()
 	if(!set_version3(cert))
 		goto fail;
 
-	if(!set_serialnumber(cert,1))
+	if(!set_serialNumber(cert,1))
 		goto fail;
 
 	if(!set_expire_date(cert,DAYS_AFTER_EXPIRE))

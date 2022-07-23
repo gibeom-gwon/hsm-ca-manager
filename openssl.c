@@ -64,7 +64,7 @@ int set_version3(X509 *cert)
 	return X509_set_version(cert,2);
 }
 
-int set_serialnumber(X509 *cert, long serial)
+int set_serialNumber(X509 *cert, long serial)
 {
 	ASN1_INTEGER *serialNumber = X509_get_serialNumber(cert);
 	if(!serialNumber)
