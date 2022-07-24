@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
 	if((engine = init_pkcs11_engine()) == NULL)
 		goto fail;
 
-	if((pubkey = get_pubkey_from_pkcs11(engine,PKCS11_URI)) == NULL)
+	if((pubkey = get_pubkey_from_pkcs11(engine,arg_pkcs11_uri)) == NULL)
 		goto fail;
 
 	if(!set_version3(cert))
@@ -152,7 +152,7 @@ int main(int argc, char *argv[])
 	if(!set_extension_key_usage(cert,KEY_USAGE_KEY_CERT_SIGN|KEY_USAGE_CRL_SIGN))
 		goto fail;
 
-	privkey = get_privkey_from_pkcs11(engine,PKCS11_URI);
+	privkey = get_privkey_from_pkcs11(engine,arg_pkcs11_uri);
 	if(privkey == NULL)
 		goto fail;
 
