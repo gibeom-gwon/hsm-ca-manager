@@ -74,17 +74,31 @@ int set_serialNumber(X509 *cert, long serial)
 	return 1;
 }
 
-X509_NAME *set_subject_name(X509 *cert, const char *C, const char *O, const char *CN)
+X509_NAME *set_subject_name(X509 *cert, const char *C, const char *O, const char *OU, const char *CN)
 {
 	X509_NAME *name = X509_get_subject_name(cert);
 	if(!name)
 		return NULL;
-	if(!X509_NAME_add_entry_by_txt(name,"C",MBSTRING_ASC,(unsigned char*)C,-1,-1,0))
-		return NULL;
-	if(!X509_NAME_add_entry_by_txt(name,"O",MBSTRING_ASC,(unsigned char*)O,-1,-1,0))
-		return NULL;
-	if(!X509_NAME_add_entry_by_txt(name,"CN",MBSTRING_ASC,(unsigned char*)CN,-1,-1,0))
-		return NULL;
+	if(C != NULL)
+	{
+		if(!X509_NAME_add_entry_by_txt(name,"C",MBSTRING_ASC,(unsigned char*)C,-1,-1,0))
+			return NULL;
+	}
+	if(O != NULL)
+	{
+		if(!X509_NAME_add_entry_by_txt(name,"O",MBSTRING_ASC,(unsigned char*)O,-1,-1,0))
+			return NULL;
+	}
+	if(OU != NULL)
+	{
+		if(!X509_NAME_add_entry_by_txt(name,"OU",MBSTRING_ASC,(unsigned char*)OU,-1,-1,0))
+			return NULL;
+	}
+	if(CN != NULL)
+	{
+		if(!X509_NAME_add_entry_by_txt(name,"CN",MBSTRING_ASC,(unsigned char*)CN,-1,-1,0))
+			return NULL;
+	}
 	return name;
 }
 
