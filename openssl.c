@@ -169,7 +169,6 @@ int set_extension_key_usage(X509 *cert, int key_usage)
 		return 0;
 
 	int bit = 0;
-	printf("%d\n",key_usage);
 	while(key_usage)
 	{
 		if(key_usage & 0x01)
