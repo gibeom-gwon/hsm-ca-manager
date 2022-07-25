@@ -3,4 +3,4 @@
 *.pem
 *.csr
 gen_root_ca_cert
-sign_csr_with_root_ca
+sign_csr
