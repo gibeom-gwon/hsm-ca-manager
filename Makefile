@@ -1,11 +1,11 @@
 CFLAGS=-Wall -O2
 LDLIBS=-lcrypto
-TARGETS=sign_csr
-OBJS=sign_csr.o openssl.o
+TARGETS=csr_sign
+OBJS=csr_sign.o openssl.o
 
 all: $(TARGETS)
 
-sign_csr: sign_csr.o openssl.o
+csr_sign: csr_sign.o openssl.o
 	$(CC) -o $@ $^ $(LDLIBS)
 
 clean:

@@ -2,4 +2,4 @@
 *.der
 *.pem
 *.csr
-sign_csr
+csr_sign
