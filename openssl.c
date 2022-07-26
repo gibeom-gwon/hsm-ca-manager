@@ -152,15 +152,29 @@ int copy_pubkey_from_csr(X509 *cert, X509_REQ *csr)
 int copy_extensions_from_csr(X509 *cert, X509_REQ *csr)
 {
 	const STACK_OF(X509_EXTENSION) *req_extensions = X509_REQ_get_extensions(csr);
-	for(int i = 0;i < sk_X509_EXTENSION_num(req_extensions);i++)
+	int extension_num = sk_X509_EXTENSION_num(req_extensions);
+	int *extension_nid_list = malloc(sizeof(int) * extension_num);
+
+	for(int i = 0;i < extension_num;i++)
 	{
 		X509_EXTENSION *ext = sk_X509_EXTENSION_value(req_extensions,i);
-		//int nid = OBJ_obj2nid(X509_EXTENSION_get_object(ext));
-		//if(nid == NID_basic_constraints)
-		//	X509_EXTENSION_set_critical(ext,1);
+		int nid = OBJ_obj2nid(X509_EXTENSION_get_object(ext));
+		extension_nid_list[i] = nid;
+	}
+
+	for(int i = 0;i < extension_num;i++)
+	{
+		X509_EXTENSION *ext = sk_X509_EXTENSION_value(req_extensions,i);
+		for(int j = i + 1;j < extension_num;j++)
+		{
+			if(extension_nid_list[i] == extension_nid_list[j])
+				return 0;
+		}
 		if(!X509_add_ext(cert,ext,-1))
 			return 0;
 	}
+
+	free(extension_nid_list);
 	return 1;
 }
 
