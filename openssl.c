@@ -301,6 +301,11 @@ int export_x509_to_pem_file(const char *filepath, X509 *cert)
 	return 1;
 }
 
+int print_x509_pem(X509 *cert)
+{
+	return PEM_write_X509(stdout,cert);
+}
+
 void csr_free(X509_REQ *csr)
 {
 	X509_REQ_free(csr);

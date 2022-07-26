@@ -6,9 +6,6 @@
 
 #define PKCS11_URI "pkcs11:manufacturer=www.CardContact.de;id=%10"
 #define DAYS_AFTER_EXPIRE 30
-#define CSR_FILE "req.csr"
-#define OUTPUT_FILE "cert.pem"
-#define CA_CERT_FILE "root_ca.pem"
 
 const char *arg_pkcs11_uri = NULL;
 int arg_expires = 0;
@@ -28,9 +25,10 @@ void print_help(const char *exec_name)
 			"Options:\n"
 			"-p --pkcs11-uri=PKCS11_URI PKCS11 URI of HSM\n"
 			"-e --expires=DAYS          Expire certificate after DAYS days\n"
-			"-c --ca-cert=CA_CERT_PATH  PEM certificate file path of CA\n"
+			"-c --ca-cert=CA_CERT_PATH  PEM certificate file path of CA. If not set, create\n"
+			"                           self signed certificate\n"
 			"-i --csr=CSR_PATH          CSR file path\n"
-			"-o --output=CERT_PATH      Certificate output path\n"
+			"-o --output=CERT_PATH      Certificate output path. If not set, print to stdin\n"
 			"-h --help                  Show this help\n",basename);
 }
 
@@ -76,25 +74,22 @@ int set_args(int argc, char *argv[])
 				break;
 			case 'h':
 				print_help(argv[0]);
-				return 0;
 			case '?':
 			default:
 				return 0;
 		}
-		if(r == '?')
-			return 0;
 	}
 
 	if(arg_pkcs11_uri == NULL)
 		arg_pkcs11_uri = PKCS11_URI;
 	if(arg_expires < 1)
 		arg_expires = DAYS_AFTER_EXPIRE;
-	if(arg_ca_cert == NULL)
-		arg_ca_cert = CA_CERT_FILE;
+
 	if(arg_csr == NULL)
-		arg_csr = CSR_FILE;
-	if(arg_output == NULL)
-		arg_output = OUTPUT_FILE;
+	{
+		fprintf(stderr,"--csr option required\n");
+		return 0;
+	}
 
 	return 1;
 }
@@ -123,7 +118,7 @@ int main(int argc, char *argv[])
 	if((cert_req = load_csr(arg_csr)) == NULL)
 		goto fail;
 
-	if((ca_cert = load_x509(arg_ca_cert)) == NULL)
+	if(arg_ca_cert != NULL && (ca_cert = load_x509(arg_ca_cert)) == NULL)
 		goto fail;
 
 	if(!set_version3(result_cert))
@@ -132,8 +127,16 @@ int main(int argc, char *argv[])
 	if(!set_subject_name_from_csr(result_cert,cert_req))
 		goto fail;
 
-	if(!set_issuer_name_from_x509(result_cert,ca_cert))
-		goto fail;
+	if(ca_cert != NULL)
+	{
+		if(!set_issuer_name_from_x509(result_cert,ca_cert))
+			goto fail;
+	}
+	else
+	{
+		if(!set_issuer_name_from_x509(result_cert,result_cert))
+			goto fail;
+	}
 
 	if(!set_expire_date(result_cert,arg_expires))
 		goto fail;
@@ -147,7 +150,7 @@ int main(int argc, char *argv[])
 	if(!set_skid(result_cert))
 		goto fail;
 
-	if(!set_akid_from_x509_skid(result_cert,ca_cert))
+	if(ca_cert != NULL && !set_akid_from_x509_skid(result_cert,ca_cert))
 		goto fail;
 
 	privkey = get_privkey_from_pkcs11(engine,arg_pkcs11_uri);
@@ -157,8 +160,16 @@ int main(int argc, char *argv[])
 	if(!sign_x509(result_cert,privkey))
 		goto fail;
 
-	if(!export_x509_to_pem_file(arg_output,result_cert))
-		goto fail;
+	if(arg_output != NULL)
+	{
+		if(!export_x509_to_pem_file(arg_output,result_cert))
+			goto fail;
+	}
+	else
+	{
+		if(!print_x509_pem(result_cert))
+			goto fail;
+	}
 
 	cleanup:
 	if(cert_req)

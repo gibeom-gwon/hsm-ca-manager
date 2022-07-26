@@ -37,6 +37,7 @@ EVP_PKEY *get_pubkey_from_pkcs11(ENGINE *engine, const char *pkcs11_uri);
 int sign_x509(X509 *cert, EVP_PKEY *key);
 int export_x509_to_der_file(const char *filepath, X509 *cert);
 int export_x509_to_pem_file(const char *filepath, X509 *cert);
+int print_x509_pem(X509 *cert);
 void csr_free(X509_REQ *csr);
 void key_free(EVP_PKEY *key);
 void engine_free(ENGINE *engine);
