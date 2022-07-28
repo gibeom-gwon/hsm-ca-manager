@@ -9,4 +9,4 @@ csr_sign: csr_sign.o openssl.o
 	$(CC) -o $@ $^ $(LDLIBS)
 
 clean:
-	rm $(TARGETS) $(OBJS)
+	rm $(TARGETS) *.o
