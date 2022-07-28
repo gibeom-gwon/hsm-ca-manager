@@ -151,7 +151,7 @@ int copy_pubkey_from_csr(X509 *cert, X509_REQ *csr)
 
 int copy_extensions_from_csr(X509 *cert, X509_REQ *csr)
 {
-	const STACK_OF(X509_EXTENSION) *req_extensions = X509_REQ_get_extensions(csr);
+	const X509_EXTENSIONS *req_extensions = X509_REQ_get_extensions(csr);
 	int extension_num = sk_X509_EXTENSION_num(req_extensions);
 	int *extension_nid_list = malloc(sizeof(int) * extension_num);
 
