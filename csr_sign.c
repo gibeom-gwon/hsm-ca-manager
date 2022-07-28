@@ -9,6 +9,7 @@
 
 const char *arg_pkcs11_uri = NULL;
 int arg_expires = 0;
+int arg_ignore_requested_extensions = 0;
 const char *arg_csr = NULL;
 const char *arg_ca_cert = NULL;
 const char *arg_output = NULL;
@@ -27,6 +28,7 @@ void print_help(const char *exec_name)
 			"-e --expires=DAYS          Expire certificate after DAYS days\n"
 			"-c --ca-cert=CA_CERT_PATH  PEM certificate file path of CA. If not set, create\n"
 			"                           self signed certificate\n"
+			"-X                         Ignore requested extensions\n"
 			"-i --csr=CSR_PATH          CSR file path\n"
 			"-o --output=CERT_PATH      Certificate output path. If not set, print to stdin\n"
 			"-h --help                  Show this help\n",basename);
@@ -46,7 +48,7 @@ int set_args(int argc, char *argv[])
 
 	int opt_idx = 0;
 	int r = 0;
-	while((r = getopt_long(argc,argv,"p:e:c:i:o:h",opts,&opt_idx)) > 0)
+	while((r = getopt_long(argc,argv,"p:e:c:Xi:o:h",opts,&opt_idx)) > 0)
 	{
 		switch(r)
 		{
@@ -65,6 +67,9 @@ int set_args(int argc, char *argv[])
 				break;
 			case 'c':
 				arg_ca_cert = optarg;
+				break;
+			case 'X':
+				arg_ignore_requested_extensions = 1;
 				break;
 			case 'i':
 				arg_csr = optarg;
@@ -144,7 +149,7 @@ int main(int argc, char *argv[])
 	if(!copy_pubkey_from_csr(result_cert,cert_req))
 		goto fail;
 
-	if(!copy_extensions_from_csr(result_cert,cert_req))
+	if(!arg_ignore_requested_extensions && !copy_extensions_from_csr(result_cert,cert_req))
 		goto fail;
 
 	if(!set_skid(result_cert))
