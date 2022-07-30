@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <string.h>
+#include <errno.h>
 #include "openssl.h"
 
 #define PKCS11_URI "pkcs11:manufacturer=www.CardContact.de;id=%10"
@@ -14,6 +15,42 @@ const char *arg_csr = NULL;
 const char *arg_ca_cert = NULL;
 const char *arg_output = NULL;
 
+int arg_extension_basic_constraints_bool = -1;
+long arg_extension_basic_constraints_pathlen = -1;
+
+int parse_arg_basic_constraints(const char *arg)
+{
+	if(strcasecmp(arg,"false") == 0)
+	{
+		arg_extension_basic_constraints_bool = 0;
+		arg_extension_basic_constraints_pathlen = -1;
+	}
+	else if(strcasecmp(arg,"true") >= 0)
+	{
+		arg_extension_basic_constraints_bool = 1;
+		if(arg[4] == 0)
+			arg_extension_basic_constraints_pathlen = -1;
+		else if(arg[4] == ':')
+		{
+			const char *pathlen = arg + 5;
+			char *endptr = NULL;
+			errno = 0;
+			arg_extension_basic_constraints_pathlen = strtol(pathlen,&endptr,10);
+			if(arg_extension_basic_constraints_pathlen < 0 || errno != 0 || *endptr != 0)
+			{
+				fprintf(stderr,"Invalid syntax of --basic-constraints argument\n");
+				return 0;
+			}
+		}
+	}
+	else
+	{
+		fprintf(stderr,"Invalid syntax of --basic-constraints argument\n");
+		return 0;
+	}
+	return 1;
+}
+
 void print_help(const char *exec_name)
 {
 	const char *basename = strrchr(exec_name,'/');
@@ -24,14 +61,15 @@ void print_help(const char *exec_name)
 
 	printf( "Usage: %s [OPTIONS...]\n\n"
 			"Options:\n"
-			"-p --pkcs11-uri=PKCS11_URI PKCS11 URI of HSM\n"
-			"-e --expires=DAYS          Expire certificate after DAYS days\n"
-			"-c --ca-cert=CA_CERT_PATH  PEM certificate file path of CA. If not set, create\n"
-			"                           self signed certificate\n"
-			"-X                         Ignore requested extensions\n"
-			"-i --csr=CSR_PATH          CSR file path\n"
-			"-o --output=CERT_PATH      Certificate output path. If not set, print to stdin\n"
-			"-h --help                  Show this help\n",basename);
+			"-p --pkcs11-uri=PKCS11_URI                  PKCS11 URI of HSM\n"
+			"-e --expires=DAYS                           Expire certificate after DAYS days\n"
+			"-c --ca-cert=CA_CERT_PATH                   PEM certificate file path of CA. If not set, create\n"
+			"                                            self signed certificate\n"
+			"-X                                          Ignore requested extensions\n"
+			"   --basic-constraints=True[:PATHLEN]|False Add basic constraints extension\n"
+			"-i --csr=CSR_PATH                           CSR file path\n"
+			"-o --output=CERT_PATH                       Certificate output path. If not set, print to stdin\n"
+			"-h --help                                   Show this help\n",basename);
 }
 
 int set_args(int argc, char *argv[])
@@ -40,6 +78,7 @@ int set_args(int argc, char *argv[])
 		{"pkcs11-uri",required_argument,0,'p'},
 		{"expires",required_argument,0,'e'},
 		{"ca-cert",required_argument,0,'c'},
+		{"basic-constraints",required_argument,0,'b'},
 		{"csr",required_argument,0,'i'},
 		{"output",required_argument,0,'o'},
 		{"help",no_argument,0,'h'},
@@ -70,6 +109,10 @@ int set_args(int argc, char *argv[])
 				break;
 			case 'X':
 				arg_ignore_requested_extensions = 1;
+				break;
+			case 'b':
+				if(!parse_arg_basic_constraints(optarg))
+					return 0;
 				break;
 			case 'i':
 				arg_csr = optarg;
@@ -151,6 +194,12 @@ int main(int argc, char *argv[])
 
 	if(!arg_ignore_requested_extensions && !copy_extensions_from_csr(result_cert,cert_req))
 		goto fail;
+
+	if(arg_extension_basic_constraints_bool != -1)
+	{
+		if(set_extension_basic_constraints(result_cert,arg_extension_basic_constraints_bool,arg_extension_basic_constraints_pathlen))
+			goto fail;
+	}
 
 	if(!set_skid(result_cert))
 		goto fail;

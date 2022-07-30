@@ -28,7 +28,7 @@ int set_expire_date(X509 *cert, unsigned int after_days);
 int set_pubkey(X509 *cert, EVP_PKEY *key);
 int copy_pubkey_from_csr(X509 *cert, X509_REQ *csr);
 int copy_extensions_from_csr(X509 *cert, X509_REQ *csr);
-int set_extension_basic_constraints(X509 *cert, int ca);
+int set_extension_basic_constraints(X509 *cert, int ca, long pathlen);
 int set_extension_key_usage(X509 *cert, int key_usage);
 int set_skid(X509 *cert);
 int set_akid_from_x509_skid(X509 *to, X509 *from);

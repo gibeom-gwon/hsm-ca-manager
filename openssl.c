@@ -178,14 +178,35 @@ int copy_extensions_from_csr(X509 *cert, X509_REQ *csr)
 	return 1;
 }
 
-int set_extension_basic_constraints(X509 *cert, int ca)
+int set_extension_basic_constraints(X509 *cert, int ca, long pathlen)
 {
 	BASIC_CONSTRAINTS *bcons = BASIC_CONSTRAINTS_new();
 	if(!bcons)
 		return 0;
-	bcons->ca = ca;
-	if(!X509_add1_ext_i2d(cert,NID_basic_constraints,bcons,1,0))
+	if(ca)
+		bcons->ca = 1;
+	else
+		bcons->ca = 0;
+	if(pathlen >= 0)
+	{
+		ASN1_INTEGER *plen = ASN1_INTEGER_new();
+		if(plen == NULL)
+		{
+			BASIC_CONSTRAINTS_free(bcons);
+			return 0;
+		}
+		if(!ASN1_INTEGER_set(plen,pathlen))
+		{
+			BASIC_CONSTRAINTS_free(bcons);
+			return 0;
+		}
+		bcons->pathlen = plen;
+	}
+	if(!X509_add1_ext_i2d(cert,NID_basic_constraints,bcons,1,X509V3_ADD_REPLACE))
+	{
+		BASIC_CONSTRAINTS_free(bcons);
 		return 0;
+	}
 	BASIC_CONSTRAINTS_free(bcons);
 	return 1;
 }
