@@ -24,6 +24,17 @@ static struct key_usage_type key_usage_list[] = {
 
 static const int key_usage_list_num = sizeof(key_usage_list) / sizeof(struct key_usage_type);
 
+static struct key_usage_type extended_key_usage_list[] = {
+	{1 << 0,"serverAuth"},
+	{1 << 1,"clientAuth"},
+	{1 << 2,"codeSigning"},
+	{1 << 3,"emailProtection"},
+	{1 << 4,"timeStamping"},
+	{1 << 5,"OCSPSigning"},
+};
+
+static const int extended_key_usage_list_num = sizeof(extended_key_usage_list) / sizeof(struct key_usage_type);
+
 int init_crypto_with_dynamic_engine()
 {
 	return OPENSSL_init_crypto(OPENSSL_INIT_ENGINE_DYNAMIC, NULL);
@@ -291,6 +302,42 @@ unsigned int get_extension_key_usage_bit_by_name(const char *name)
 	{
 		if(strcasecmp(name,key_usage_list[i].name) == 0)
 			return key_usage_list[i].bit;
+	}
+	return 0;
+}
+
+int set_extension_extended_key_usage(X509 *cert, unsigned int extended_key_usage)
+{
+	int max_flag = (1 << extended_key_usage_list_num) - 1;
+	if(max_flag < extended_key_usage)
+		return 0;
+
+	EXTENDED_KEY_USAGE* extku = EXTENDED_KEY_USAGE_new();
+	int idx = 0;
+	while(extended_key_usage)
+	{
+		if(extended_key_usage & 0x1)
+		{
+			ASN1_OBJECT *obj = OBJ_txt2obj(extended_key_usage_list[idx].name,0);
+			sk_ASN1_OBJECT_push(extku,obj);
+			ASN1_OBJECT_free(obj);
+		}
+		idx++;
+		extended_key_usage >>= 1;
+	}
+
+	X509_add1_ext_i2d(cert,NID_ext_key_usage,extku,0,X509V3_ADD_REPLACE);
+	EXTENDED_KEY_USAGE_free(extku);
+
+	return 1;
+}
+
+unsigned get_extension_extended_key_usage_bit_by_name(const char *name)
+{
+	for(int i = 0;i < extended_key_usage_list_num;i++)
+	{
+		if(strcasecmp(name,extended_key_usage_list[i].name) == 0)
+			return extended_key_usage_list[i].bit;
 	}
 	return 0;
 }
