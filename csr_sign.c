@@ -203,6 +203,9 @@ int main(int argc, char *argv[])
 	if(!set_version3(result_cert))
 		goto fail;
 
+	if(!set_random_serialNumber(result_cert))
+		goto fail;
+
 	if(!set_subject_name_from_csr(result_cert,cert_req))
 		goto fail;
 
@@ -277,30 +280,6 @@ int main(int argc, char *argv[])
 	ret = -1;
 	goto cleanup;
 }
-
-	/*
-	AUTHORITY_KEYID *akid = AUTHORITY_KEYID_new();
-	if(!akid)
-		goto fail;
-	akid->keyid = ASN1_STRING_new();
-	if(!akid->keyid)
-	{
-		AUTHORITY_KEYID_free(akid);
-		goto fail;
-	}
-	if(!ASN1_STRING_set(akid->keyid,pubkey_hash,SHA_DIGEST_LENGTH))
-	{
-		AUTHORITY_KEYID_free(akid);
-		goto fail;
-	}
-	if(X509_add1_ext_i2d(cert,NID_authority_key_identifier,akid,0,0) < 1)
-	{
-		AUTHORITY_KEYID_free(akid);
-		goto fail;
-	}
-	AUTHORITY_KEYID_free(akid);
-	*/
-
 	/*
 	ASN1_OBJECT *obj;
 	EXTENDED_KEY_USAGE* extku = EXTENDED_KEY_USAGE_new();

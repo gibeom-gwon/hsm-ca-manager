@@ -95,6 +95,26 @@ int set_serialNumber(X509 *cert, long serial)
 	return 1;
 }
 
+int set_random_serialNumber(X509 *cert)
+{
+	ASN1_INTEGER *serialNumber = X509_get_serialNumber(cert);
+	if(!serialNumber)
+		return 0;
+	unsigned char buf[18];
+	if(!RAND_bytes(buf,sizeof(buf)))
+		return 0;
+	BIGNUM *bn = BN_bin2bn(buf,sizeof(buf),NULL);
+	if(bn == NULL)
+		return 0;
+	if(BN_to_ASN1_INTEGER(bn,serialNumber) == NULL)
+	{
+		BN_free(bn);
+		return 0;
+	}
+	BN_free(bn);
+	return 1;
+}
+
 X509_NAME *set_subject_name(X509 *cert, const char *C, const char *O, const char *OU, const char *CN)
 {
 	X509_NAME *name = X509_get_subject_name(cert);
