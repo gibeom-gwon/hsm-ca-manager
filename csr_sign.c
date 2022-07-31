@@ -11,6 +11,7 @@
 const char *arg_pkcs11_uri = NULL;
 int arg_expires = 0;
 int arg_ignore_requested_extensions = 0;
+unsigned int arg_key_usage_flag = 0;
 const char *arg_csr = NULL;
 const char *arg_ca_cert = NULL;
 const char *arg_output = NULL;
@@ -51,6 +52,30 @@ int parse_arg_basic_constraints(const char *arg)
 	return 1;
 }
 
+int parse_arg_key_usage(const char *arg)
+{
+	unsigned int flag = 0;
+	char *str = strdup(arg);
+	char *tok = strtok(str,",");
+
+	while(tok != NULL)
+	{
+		int bit = get_extension_key_usage_bit_by_name(tok);
+		if(bit == 0)
+		{
+			fprintf(stderr,"invalid --key-usage argument '%s'.\n",tok);
+			free(str);
+			return 0;
+		}
+		flag |= bit;
+		tok = strtok(NULL,",");
+	}
+	free(str);
+
+	arg_key_usage_flag = flag;
+	return 1;
+}
+
 void print_help(const char *exec_name)
 {
 	const char *basename = strrchr(exec_name,'/');
@@ -61,15 +86,16 @@ void print_help(const char *exec_name)
 
 	printf( "Usage: %s [OPTIONS...]\n\n"
 			"Options:\n"
-			"-p --pkcs11-uri=PKCS11_URI                  PKCS11 URI of HSM\n"
-			"-e --expires=DAYS                           Expire certificate after DAYS days\n"
-			"-c --ca-cert=CA_CERT_PATH                   PEM certificate file path of CA. If not set, create\n"
-			"                                            self signed certificate\n"
-			"-X                                          Ignore requested extensions\n"
-			"   --basic-constraints=True[:PATHLEN]|False Add basic constraints extension\n"
-			"-i --csr=CSR_PATH                           CSR file path\n"
-			"-o --output=CERT_PATH                       Certificate output path. If not set, print to stdin\n"
-			"-h --help                                   Show this help\n",basename);
+			"-p --pkcs11-uri=PKCS11_URI                     PKCS11 URI of HSM\n"
+			"-e --expires=DAYS                              Expire certificate after DAYS days\n"
+			"-c --ca-cert=CA_CERT_PATH                      PEM certificate file path of CA. If not set,\n"
+			"                                               create self signed certificate\n"
+			"-X                                             Ignore requested extensions\n"
+			"   --basic-constraints=True[:PATHLEN]|False    Add basic constraints extension\n"
+			"   --key-usage=KEY_USAGE_TYPE[,KEY_USAGE_TYPE] Add basic constraints extension\n"
+			"-i --csr=CSR_PATH                              CSR file path\n"
+			"-o --output=CERT_PATH                          Certificate output path. If not set, print to stdin\n"
+			"-h --help                                      Show this help\n",basename);
 }
 
 int set_args(int argc, char *argv[])
@@ -79,6 +105,7 @@ int set_args(int argc, char *argv[])
 		{"expires",required_argument,0,'e'},
 		{"ca-cert",required_argument,0,'c'},
 		{"basic-constraints",required_argument,0,'b'},
+		{"key-usage",required_argument,0,'k'},
 		{"csr",required_argument,0,'i'},
 		{"output",required_argument,0,'o'},
 		{"help",no_argument,0,'h'},
@@ -112,6 +139,10 @@ int set_args(int argc, char *argv[])
 				break;
 			case 'b':
 				if(!parse_arg_basic_constraints(optarg))
+					return 0;
+				break;
+			case 'k':
+				if(!parse_arg_key_usage(optarg))
 					return 0;
 				break;
 			case 'i':
@@ -200,6 +231,9 @@ int main(int argc, char *argv[])
 		if(set_extension_basic_constraints(result_cert,arg_extension_basic_constraints_bool,arg_extension_basic_constraints_pathlen))
 			goto fail;
 	}
+
+	if(arg_key_usage_flag && !set_extension_key_usage(result_cert,arg_key_usage_flag))
+		goto fail;
 
 	if(!set_skid(result_cert))
 		goto fail;

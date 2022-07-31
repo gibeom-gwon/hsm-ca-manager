@@ -1,7 +1,28 @@
 #include "openssl.h"
 #include <stdio.h>
+#include <string.h>
 #include <openssl/crypto.h>
 #include <openssl/engine.h>
+
+struct key_usage_type {
+	unsigned int bit;
+	const char* name;
+};
+
+static struct key_usage_type key_usage_list[] = {
+	{1 << 0,"digitalSignature"},
+	{1 << 1,"nonRepudiation"},
+	{1 << 1,"contentCommitment"}, // renamed
+	{1 << 2,"keyEncipherment"},
+	{1 << 3,"dataEncipherment"},
+	{1 << 4,"keyAgreement"},
+	{1 << 5,"keyCertSign"},
+	{1 << 6,"cRLSign"},
+	{1 << 7,"encipherOnly"},
+	{1 << 8,"decipherOnly"},
+};
+
+static const int key_usage_list_num = sizeof(key_usage_list) / sizeof(struct key_usage_type);
 
 int init_crypto_with_dynamic_engine()
 {
@@ -211,8 +232,12 @@ int set_extension_basic_constraints(X509 *cert, int ca, long pathlen)
 	return 1;
 }
 
-int set_extension_key_usage(X509 *cert, int key_usage)
+int set_extension_key_usage(X509 *cert, unsigned int key_usage)
 {
+	int max_flag = (1 << key_usage_list_num) - 1;
+	if(max_flag < key_usage)
+		return 0;
+
 	ASN1_BIT_STRING *bs = ASN1_BIT_STRING_new();
 	if(!bs)
 		return 0;
@@ -231,13 +256,23 @@ int set_extension_key_usage(X509 *cert, int key_usage)
 		key_usage >>= 1;
 		bit++;
 	}
-	if(X509_add1_ext_i2d(cert,NID_key_usage,bs,1,0) < 1)
+	if(X509_add1_ext_i2d(cert,NID_key_usage,bs,1,X509V3_ADD_REPLACE) < 1)
 	{
 		ASN1_BIT_STRING_free(bs);
 		return 0;
 	}
 	ASN1_BIT_STRING_free(bs);
 	return 1;
+}
+
+unsigned int get_extension_key_usage_bit_by_name(const char *name)
+{
+	for(int i = 0;i < key_usage_list_num;i++)
+	{
+		if(strcasecmp(name,key_usage_list[i].name) == 0)
+			return key_usage_list[i].bit;
+	}
+	return 0;
 }
 
 int set_skid(X509 *cert)
