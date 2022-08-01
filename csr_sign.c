@@ -210,92 +210,92 @@ int main(int argc, char *argv[])
 {
 	int ret = 0;
 
-	if(!set_args(argc,argv))
-		return -1;
-
 	X509 *ca_cert = NULL, *result_cert = NULL;
 	X509_REQ *cert_req = NULL;
 	ENGINE *engine = NULL;
 	EVP_PKEY *privkey = NULL;
 
-	if(!init_crypto_with_dynamic_engine())
+	if(!set_args(argc,argv))
 		goto fail;
+
+	if(!init_crypto_with_dynamic_engine())
+		goto openssl_fail;
 
 	if((result_cert = x509_new()) == NULL)
-		goto fail;
+		goto openssl_fail;
 
 	if((engine = init_pkcs11_engine()) == NULL)
-		goto fail;
+		goto openssl_fail;
 
 	if((cert_req = load_csr(arg_csr)) == NULL)
-		goto fail;
+		goto openssl_fail;
 
 	if(arg_ca_cert != NULL && (ca_cert = load_x509(arg_ca_cert)) == NULL)
-		goto fail;
+		goto openssl_fail;
 
 	if(!set_version3(result_cert))
-		goto fail;
+		goto openssl_fail;
 
 	if(!set_random_serialNumber(result_cert))
-		goto fail;
+		goto openssl_fail;
 
 	if(!set_subject_name_from_csr(result_cert,cert_req))
-		goto fail;
+		goto openssl_fail;
 
 	if(ca_cert != NULL)
 	{
 		if(!set_issuer_name_from_x509(result_cert,ca_cert))
-			goto fail;
+			goto openssl_fail;
 	}
 	else
 	{
 		if(!set_issuer_name_from_x509(result_cert,result_cert))
-			goto fail;
+			goto openssl_fail;
 	}
 
 	if(!set_expire_date(result_cert,arg_expires))
-		goto fail;
+		goto openssl_fail;
 
 	if(!copy_pubkey_from_csr(result_cert,cert_req))
-		goto fail;
+		goto openssl_fail;
 
 	if(!arg_ignore_requested_extensions && !copy_extensions_from_csr(result_cert,cert_req))
-		goto fail;
+		goto openssl_fail;
 
 	if(arg_extension_basic_constraints_bool != -1)
 	{
 		if(set_extension_basic_constraints(result_cert,arg_extension_basic_constraints_bool,arg_extension_basic_constraints_pathlen))
-			goto fail;
+			goto openssl_fail;
 	}
 
 	if(arg_key_usage_flag && !set_extension_key_usage(result_cert,arg_key_usage_flag))
-		goto fail;
+		goto openssl_fail;
 
 	if(arg_extended_key_usage_flag && !set_extension_extended_key_usage(result_cert,arg_extended_key_usage_flag))
-		goto fail;
+		goto openssl_fail;
 
 	if(!set_skid(result_cert))
-		goto fail;
+		goto openssl_fail;
 
 	if(ca_cert != NULL && !set_akid_from_x509_skid(result_cert,ca_cert))
-		goto fail;
+		goto openssl_fail;
 
 	privkey = get_privkey_from_pkcs11(engine,arg_pkcs11_uri);
 	if(privkey == NULL)
-		goto fail;
+		goto openssl_fail;
 
 	if(!sign_x509(result_cert,privkey))
-		goto fail;
+		goto openssl_fail;
 
 	if(arg_output != NULL)
 	{
 		if(!export_x509_to_pem_file(arg_output,result_cert))
-			goto fail;
+			goto openssl_fail;
 	}
 	else
 	{
 		if(!print_x509_pem(result_cert))
-			goto fail;
+			goto openssl_fail;
 	}
 
 	cleanup:
@@ -311,8 +311,9 @@ int main(int argc, char *argv[])
 		x509_free(result_cert);
 	return ret;
 
-	fail:
+	openssl_fail:
 	fprintf(stderr,"openssl error: %s\n",ssl_get_error_string());
+	fail:
 	ret = -1;
 	goto cleanup;
 }
