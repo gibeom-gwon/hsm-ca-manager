@@ -4,6 +4,13 @@
 #include <openssl/x509v3.h>
 #include <openssl/err.h>
 
+#define SAN_TYPE_DNS GEN_DNS
+
+struct subject_alt_name {
+	int type;
+	char *value;
+};
+
 int init_crypto_with_dynamic_engine();
 ENGINE *init_pkcs11_engine();
 X509_REQ *load_csr(const char *filepath);
@@ -24,6 +31,7 @@ int set_extension_key_usage(X509 *cert, unsigned int key_usage);
 unsigned int get_extension_key_usage_bit_by_name(const char *name);
 int set_extension_extended_key_usage(X509 *cert, unsigned int extended_key_usage);
 unsigned get_extension_extended_key_usage_bit_by_name(const char *name);
+int set_extension_subject_alt_name(X509 *cert, struct subject_alt_name *list,int num);
 int set_skid(X509 *cert);
 int set_akid_from_x509_skid(X509 *to, X509 *from);
 EVP_PKEY *get_privkey_from_pkcs11(ENGINE *engine, const char *pkcs11_uri);

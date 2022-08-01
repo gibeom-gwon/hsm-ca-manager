@@ -342,6 +342,59 @@ unsigned get_extension_extended_key_usage_bit_by_name(const char *name)
 	return 0;
 }
 
+int set_extension_subject_alt_name(X509 *cert, struct subject_alt_name *list,int num)
+{
+	GENERAL_NAMES *gens = sk_GENERAL_NAME_new_null();
+	if(gens == NULL)
+		return 0;
+
+	for(int i = 0;i < num;i++)
+	{
+		GENERAL_NAME *gen = GENERAL_NAME_new();
+		if(gen == NULL)
+		{
+			sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
+			return 0;
+		}
+		switch(list[i].type)
+		{
+			case SAN_TYPE_DNS:
+				ASN1_IA5STRING *str = ASN1_IA5STRING_new();
+				if(str == NULL)
+				{
+					sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
+					return 0;
+				}
+				if(!ASN1_STRING_set(str,list[i].value,strlen(list[i].value)))
+				{
+					ASN1_IA5STRING_free(str);
+					sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
+					return 0;
+				}
+				GENERAL_NAME_set0_value(gen,list[i].type,str);
+				if(!sk_GENERAL_NAME_push(gens,gen))
+				{
+					ASN1_IA5STRING_free(str);
+					sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
+					return 0;
+				}
+			break;
+			default:
+				sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
+				return 0;
+		}
+	}
+
+	if(!X509_add1_ext_i2d(cert,NID_subject_alt_name,gens,0,X509V3_ADD_REPLACE))
+	{
+		sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
+		return 0;
+	}
+
+	sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
+	return 1;
+}
+
 int set_skid(X509 *cert)
 {
 	unsigned char pubkey_hash[SHA_DIGEST_LENGTH];

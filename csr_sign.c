@@ -16,6 +16,8 @@ unsigned int arg_extended_key_usage_flag = 0;
 const char *arg_csr = NULL;
 const char *arg_ca_cert = NULL;
 const char *arg_output = NULL;
+struct subject_alt_name *arg_subject_alt_name = NULL;
+int arg_subject_alt_name_num = 0;
 
 int arg_extension_basic_constraints_bool = -1;
 long arg_extension_basic_constraints_pathlen = -1;
@@ -101,6 +103,58 @@ int parse_arg_extended_key_usage(const char *arg)
 	return 1;
 }
 
+int parse_arg_subject_alt_name(const char *arg)
+{
+	char *str = strdup(arg);
+	char *saveptr1 = NULL;
+	char *tok = strtok_r(str,",",&saveptr1);
+	while(tok != NULL)
+	{
+		char *saveptr2 = NULL;
+		char *type = strtok_r(tok,":",&saveptr2);
+		char *value = strtok_r(NULL,"",&saveptr2);
+		if(value == NULL)
+		{
+			free(str);
+			return 0;
+		}
+
+		void *buff = NULL;
+		if(arg_subject_alt_name == NULL)
+			buff = malloc(sizeof(struct subject_alt_name));
+		else
+			buff = realloc(arg_subject_alt_name,sizeof(struct subject_alt_name) * (arg_subject_alt_name_num + 1));
+
+		if(buff == NULL)
+		{
+			free(str);
+			return 0;
+		}
+		arg_subject_alt_name = buff;
+		arg_subject_alt_name_num++;
+
+		struct subject_alt_name *san = &arg_subject_alt_name[arg_subject_alt_name_num - 1];
+		san->value = NULL;
+
+		if(strcasecmp(type,"dns") == 0)
+		{
+			san->type = SAN_TYPE_DNS;
+			san->value = strdup(value);
+		}
+		else
+		{
+			fprintf(stderr,"unknown subject alt name type '%s'\n",type);
+			free(str);
+			return 0;
+		}
+
+		tok = strtok_r(NULL,",",&saveptr1);
+	}
+
+	free(str);
+	return 1;
+}
+
 void print_help(const char *exec_name)
 {
 	const char *basename = strrchr(exec_name,'/');
@@ -121,6 +175,8 @@ void print_help(const char *exec_name)
 			"                                            Add key usage extension\n"
 			"   --extended-key-usage=KEY_USAGE_TYPE[,KEY_USAGE_TYPE]\n"
 			"                                            Add extended key usage extension\n"
+			"   --subject-alt-name=TYPE:ALT_NAME[,TYPE:ALT_NAME]\n"
+			"                                            Add subject alt name extension\n"
 			"-i --csr=CSR_PATH                           CSR file path\n"
 			"-o --output=CERT_PATH                       Certificate output path. If not set, print to stdin\n"
 			"-h --help                                   Show this help\n",basename);
@@ -135,6 +191,7 @@ int set_args(int argc, char *argv[])
 		{"basic-constraints",required_argument,0,'b'},
 		{"key-usage",required_argument,0,'k'},
 		{"extended-key-usage",required_argument,0,'K'},
+		{"subject-alt-name",required_argument,0,'s'},
 		{"csr",required_argument,0,'i'},
 		{"output",required_argument,0,'o'},
 		{"help",no_argument,0,'h'},
@@ -176,6 +233,10 @@ int set_args(int argc, char *argv[])
 				break;
 			case 'K':
 				if(!parse_arg_extended_key_usage(optarg))
+					return 0;
+				break;
+			case 's':
+				if(!parse_arg_subject_alt_name(optarg))
 					return 0;
 				break;
 			case 'i':
@@ -274,6 +335,9 @@ int main(int argc, char *argv[])
 	if(arg_extended_key_usage_flag && !set_extension_extended_key_usage(result_cert,arg_extended_key_usage_flag))
 		goto openssl_fail;
 
+	if(arg_subject_alt_name && !set_extension_subject_alt_name(result_cert,arg_subject_alt_name,arg_subject_alt_name_num))
+		goto openssl_fail;
+
 	if(!set_skid(result_cert))
 		goto openssl_fail;
 
@@ -299,6 +363,13 @@ int main(int argc, char *argv[])
 	}
 
 	cleanup:
+	if(arg_subject_alt_name)
+	{
+		for(int i = 0;i < arg_subject_alt_name_num;i++)
+			if(arg_subject_alt_name[i].value != NULL)
+				free(arg_subject_alt_name[i].value);
+		free(arg_subject_alt_name);
+	}
 	if(cert_req)
 		csr_free(cert_req);
 	if(privkey)
