@@ -141,9 +141,19 @@ int parse_arg_subject_alt_name(const char *arg)
 			san->type = SAN_TYPE_DNS;
 			san->value = strdup(value);
 		}
+		else if(strcasecmp(type,"EMAIL") == 0)
+		{
+			san->type = SAN_TYPE_EMAIL;
+			san->value = strdup(value);
+		}
+		else if(strcasecmp(type,"URI") == 0)
+		{
+			san->type = SAN_TYPE_URI;
+			san->value = strdup(value);
+		}
 		else
 		{
-			fprintf(stderr,"unknown subject alt name type '%s'\n",type);
+			fprintf(stderr,"unknown subject alt name type '%s'. Supported types: DNS, EMAIL, URI\n",type);
 			free(str);
 			return 0;
 		}

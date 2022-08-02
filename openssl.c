@@ -359,6 +359,8 @@ int set_extension_subject_alt_name(X509 *cert, struct subject_alt_name *list,int
 		switch(list[i].type)
 		{
 			case SAN_TYPE_DNS:
+			case SAN_TYPE_EMAIL:
+			case SAN_TYPE_URI:
 				ASN1_IA5STRING *str = ASN1_IA5STRING_new();
 				if(str == NULL)
 				{

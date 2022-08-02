@@ -5,6 +5,8 @@
 #include <openssl/err.h>
 
 #define SAN_TYPE_DNS GEN_DNS
+#define SAN_TYPE_EMAIL GEN_EMAIL
+#define SAN_TYPE_URI GEN_URI
 
 struct subject_alt_name {
 	int type;
