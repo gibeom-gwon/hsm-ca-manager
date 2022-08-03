@@ -356,6 +356,8 @@ int set_extension_subject_alt_name(X509 *cert, struct subject_alt_name *list,int
 			sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
 			return 0;
 		}
+
+		ASN1_OCTET_STRING *oct_str = NULL;
 		switch(list[i].type)
 		{
 			case SAN_TYPE_DNS:
@@ -377,6 +379,48 @@ int set_extension_subject_alt_name(X509 *cert, struct subject_alt_name *list,int
 				if(!sk_GENERAL_NAME_push(gens,gen))
 				{
 					ASN1_IA5STRING_free(str);
+					sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
+					return 0;
+				}
+			break;
+			case SAN_TYPE_IPV4:
+				oct_str = ASN1_OCTET_STRING_new();
+				if(str == NULL)
+				{
+					sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
+					return 0;
+				}
+				if(!ASN1_OCTET_STRING_set(oct_str,(unsigned char*)list[i].value,4))
+				{
+					ASN1_OCTET_STRING_free(oct_str);
+					sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
+					return 0;
+				}
+				GENERAL_NAME_set0_value(gen,GEN_IPADD,oct_str);
+				if(!sk_GENERAL_NAME_push(gens,gen))
+				{
+					ASN1_OCTET_STRING_free(oct_str);
+					sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
+					return 0;
+				}
+			break;
+			case SAN_TYPE_IPV6:
+				oct_str = ASN1_OCTET_STRING_new();
+				if(str == NULL)
+				{
+					sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
+					return 0;
+				}
+				if(!ASN1_OCTET_STRING_set(oct_str,(unsigned char*)list[i].value,16))
+				{
+					ASN1_OCTET_STRING_free(oct_str);
+					sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
+					return 0;
+				}
+				GENERAL_NAME_set0_value(gen,GEN_IPADD,oct_str);
+				if(!sk_GENERAL_NAME_push(gens,gen))
+				{
+					ASN1_OCTET_STRING_free(oct_str);
 					sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
 					return 0;
 				}

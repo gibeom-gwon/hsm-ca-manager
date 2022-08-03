@@ -7,6 +7,8 @@
 #define SAN_TYPE_DNS GEN_DNS
 #define SAN_TYPE_EMAIL GEN_EMAIL
 #define SAN_TYPE_URI GEN_URI
+#define SAN_TYPE_IPV4 254
+#define SAN_TYPE_IPV6 255
 
 struct subject_alt_name {
 	int type;
