@@ -1,0 +1,27 @@
+#ifndef __CERT_EXT_H__
+#define __CERT_EXT_H__
+
+#include <openssl/x509v3.h>
+
+#define SAN_TYPE_DNS GEN_DNS
+#define SAN_TYPE_EMAIL GEN_EMAIL
+#define SAN_TYPE_URI GEN_URI
+#define SAN_TYPE_IPV4 254
+#define SAN_TYPE_IPV6 255
+
+struct subject_alt_name {
+	int type;
+	char *value;
+};
+
+int copy_extensions_from_csr(X509 *cert, X509_REQ *csr);
+int set_extension_basic_constraints(X509 *cert, int ca, long pathlen);
+int set_extension_key_usage(X509 *cert, unsigned int key_usage);
+unsigned int get_extension_key_usage_bit_by_name(const char *name);
+int set_extension_extended_key_usage(X509 *cert, unsigned int extended_key_usage);
+unsigned get_extension_extended_key_usage_bit_by_name(const char *name);
+int set_extension_subject_alt_name(X509 *cert, struct subject_alt_name *list,int num);
+int set_skid(X509 *cert);
+int set_akid_from_x509_skid(X509 *to, X509 *from);
+
+#endif

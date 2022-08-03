@@ -4,6 +4,7 @@
 #include <string.h>
 #include <errno.h>
 #include "openssl.h"
+#include "ip.h"
 
 #define PKCS11_URI "pkcs11:manufacturer=www.CardContact.de;id=%10"
 #define DAYS_AFTER_EXPIRE 30
@@ -101,149 +102,6 @@ int parse_arg_extended_key_usage(const char *arg)
 
 	arg_extended_key_usage_flag = flag;
 	return 1;
-}
-
-unsigned char *parse_ipv4(const char *arg)
-{
-	unsigned char *buff = malloc(sizeof(unsigned char) * 4);
-	const char *chr = arg;
-	int oct = 0;
-	int num = -1;
-	while(*chr != 0)
-	{
-		if(*chr == '.')
-		{
-			if(oct >= 3 || num == -1)
-			{
-				free(buff);
-				return NULL;
-			}
-			buff[oct++] = num;
-			num = -1;
-		}
-		else
-		{
-			if(*chr < '0' || *chr > '9')
-			{
-				free(buff);
-				return NULL;
-			}
-			if(num == -1)
-				num = *chr - '0';
-			else
-			{
-				num *= 10;
-				num += *chr - '0';
-			}
-
-			if(num > 255)
-			{
-				free(buff);
-				return NULL;
-			}
-		}
-		chr++;
-	}
-
-	if(num == -1)
-	{
-		free(buff);
-		return NULL;
-	}
-	buff[oct] = num;
-	return buff;
-}
-
-unsigned char *parse_ipv6(const char *arg)
-{
-	unsigned char *buff = malloc(sizeof(unsigned char) * 16);
-	const char *chr = arg;
-	int oct = 0;
-	int num = -1;
-
-	int ellipsis_oct = -1;
-
-	while(*chr != 0)
-	{
-		if(*chr == ':')
-		{
-			if(num == -1)
-			{
-				if(ellipsis_oct != -1)
-				{
-					free(buff);
-					return NULL;
-				}
-				ellipsis_oct = oct;
-				chr++;
-				continue;
-			}
-
-			if(oct >= 14)
-			{
-				free(buff);
-				return NULL;
-			}
-			buff[oct++] = num >> 8;
-			buff[oct++] = num & 0xFF;
-			num = -1;
-		}
-		else
-		{
-			int bit = 0;
-			if(*chr >= '0' && *chr <= '9')
-				bit = *chr - '0';
-			else if(*chr >= 'a' && *chr <= 'f')
-				bit = *chr - 'a' + 10;
-			else if(*chr >= 'A' && *chr <= 'F')
-				bit = *chr - 'A' + 10;
-			else
-			{
-				free(buff);
-				return NULL;
-			}
-
-			if(num == -1)
-				num = bit;
-			else
-			{
-				num <<= 4;
-				num += bit;
-			}
-
-			if(num > 0xFFFF)
-			{
-				free(buff);
-				return NULL;
-			}
-		}
-		chr++;
-	}
-
-	if(num != -1)
-	{
-		buff[oct++] = num >> 8;
-		buff[oct++] = num & 0xFF;
-	}
-	else
-	{
-		buff[oct++] = 0;
-		buff[oct++] = 0;
-	}
-
-	if(ellipsis_oct != -1)
-	{
-		int mov_oct = 16 - oct;
-
-		for(int i = 15; i >= ellipsis_oct;i--)
-		{
-			if(ellipsis_oct <= i - mov_oct)
-				buff[i] = buff[i - mov_oct];
-			else
-				buff[i] = 0;
-		}
-	}
-	return buff;
 }
 
 int parse_arg_subject_alt_name(const char *arg)
@@ -450,19 +308,16 @@ int main(int argc, char *argv[])
 
 	X509 *ca_cert = NULL, *result_cert = NULL;
 	X509_REQ *cert_req = NULL;
-	ENGINE *engine = NULL;
+	ENGINE *hsm = NULL;
 	EVP_PKEY *privkey = NULL;
 
 	if(!set_args(argc,argv))
 		goto fail;
 
-	if(!init_crypto_with_dynamic_engine())
+	if((hsm = hsm_init()) == NULL)
 		goto openssl_fail;
 
 	if((result_cert = x509_new()) == NULL)
-		goto openssl_fail;
-
-	if((engine = init_pkcs11_engine()) == NULL)
 		goto openssl_fail;
 
 	if((cert_req = load_csr(arg_csr)) == NULL)
@@ -521,7 +376,7 @@ int main(int argc, char *argv[])
 	if(ca_cert != NULL && !set_akid_from_x509_skid(result_cert,ca_cert))
 		goto openssl_fail;
 
-	privkey = get_privkey_from_pkcs11(engine,arg_pkcs11_uri);
+	privkey = get_privkey_from_hsm(hsm,arg_pkcs11_uri);
 	if(privkey == NULL)
 		goto openssl_fail;
 
@@ -551,8 +406,8 @@ int main(int argc, char *argv[])
 		csr_free(cert_req);
 	if(privkey)
 		key_free(privkey);
-	if(engine)
-		engine_free(engine);
+	if(hsm)
+		hsm_free(hsm);
 	if(ca_cert)
 		x509_free(ca_cert);
 	if(result_cert)
