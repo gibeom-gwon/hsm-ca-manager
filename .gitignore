@@ -3,3 +3,4 @@
 *.pem
 *.csr
 csr_sign
+csr_gen

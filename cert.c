@@ -37,7 +37,7 @@ int set_random_serialNumber(X509 *cert)
 	return 1;
 }
 
-X509_NAME *set_subject_name(X509 *cert, const char *C, const char *O, const char *OU, const char *CN)
+X509_NAME *make_simple_subject_name(X509 *cert, const char *C, const char *O, const char *OU, const char *CN)
 {
 	X509_NAME *name = X509_get_subject_name(cert);
 	if(!name)
@@ -63,6 +63,11 @@ X509_NAME *set_subject_name(X509 *cert, const char *C, const char *O, const char
 			return NULL;
 	}
 	return name;
+}
+
+int set_subject_name_to_csr(X509_REQ *csr, X509_NAME *name)
+{
+	return X509_REQ_set_subject_name(csr,name);
 }
 
 int set_issuer_name(X509 *cert, X509_NAME *name)
@@ -102,6 +107,11 @@ int set_pubkey(X509 *cert, EVP_PKEY *key)
 	return X509_set_pubkey(cert,key);
 }
 
+int set_pubkey_to_csr(X509_REQ *csr, EVP_PKEY *key)
+{
+	return X509_REQ_set_pubkey(csr,key);
+}
+
 int copy_pubkey_from_csr(X509 *cert, X509_REQ *csr)
 {
 	EVP_PKEY *req_pubkey = X509_REQ_get0_pubkey(csr);
@@ -117,6 +127,11 @@ int sign_x509(X509 *cert, EVP_PKEY *key)
 	return X509_sign(cert,key,EVP_sha256());
 }
 
+int sign_csr(X509_REQ *csr, EVP_PKEY *key)
+{
+	return X509_REQ_sign(csr,key,EVP_sha256());
+}
+
 void csr_free(X509_REQ *csr)
 {
 	X509_REQ_free(csr);
@@ -130,4 +145,24 @@ X509 *x509_new()
 void x509_free(X509 *cert)
 {
 	X509_free(cert);
+}
+
+X509_REQ *csr_new()
+{
+	return X509_REQ_new();
+}
+
+X509_NAME *x509_name_new()
+{
+	return X509_NAME_new();
+}
+
+void x509_name_free(X509_NAME *name)
+{
+	X509_NAME_free(name);
+}
+
+int x509_name_add_entry(X509_NAME *name, const char *field, const char *value)
+{
+	return X509_NAME_add_entry_by_txt(name,field,MBSTRING_UTF8,(const unsigned char*)value,-1,-1,0);
 }

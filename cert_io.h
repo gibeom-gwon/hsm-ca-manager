@@ -8,5 +8,7 @@ X509 *load_x509(const char *filepath);
 int export_x509_to_der_file(const char *filepath, X509 *cert);
 int export_x509_to_pem_file(const char *filepath, X509 *cert);
 int print_x509_pem(X509 *cert);
+int export_csr_to_pem_file(const char *filepath, X509_REQ *csr);
+int print_csr_pem(X509_REQ *csr);
 
 #endif
