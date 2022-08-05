@@ -357,7 +357,7 @@ int main(int argc, char *argv[])
 
 	if(arg_extension_basic_constraints_bool != -1)
 	{
-		if(set_extension_basic_constraints(result_cert,arg_extension_basic_constraints_bool,arg_extension_basic_constraints_pathlen))
+		if(!set_extension_basic_constraints(result_cert,arg_extension_basic_constraints_bool,arg_extension_basic_constraints_pathlen))
 			goto openssl_fail;
 	}
 
