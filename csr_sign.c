@@ -212,6 +212,8 @@ void print_help(const char *exec_name)
 			"                                            Add extended key usage extension\n"
 			"   --subject-alt-name=TYPE:ALT_NAME[,TYPE:ALT_NAME]\n"
 			"                                            Add subject alt name extension\n"
+			"   --root-ca-ext                            Shortcut of --basic-constraints=True\n"
+			"                                            --key-usage=keyCertSign,cRLSign option\n"
 			"-i --csr=CSR_PATH                           CSR file path\n"
 			"-o --output=CERT_PATH                       Certificate output path. If not set, print to stdin\n"
 			"-h --help                                   Show this help\n",basename);
@@ -227,6 +229,7 @@ int set_args(int argc, char *argv[])
 		{"key-usage",required_argument,0,'k'},
 		{"extended-key-usage",required_argument,0,'K'},
 		{"subject-alt-name",required_argument,0,'s'},
+		{"root-ca-ext",no_argument,0,'r'},
 		{"csr",required_argument,0,'i'},
 		{"output",required_argument,0,'o'},
 		{"help",no_argument,0,'h'},
@@ -272,6 +275,12 @@ int set_args(int argc, char *argv[])
 				break;
 			case 's':
 				if(!parse_arg_subject_alt_name(optarg))
+					return 0;
+				break;
+			case 'r':
+				if(!parse_arg_basic_constraints("True"))
+					return 0;
+				if(!parse_arg_key_usage("keyCertSign,cRLSign"))
 					return 0;
 				break;
 			case 'i':
