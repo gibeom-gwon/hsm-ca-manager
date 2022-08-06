@@ -166,3 +166,13 @@ int x509_name_add_entry(X509_NAME *name, const char *field, const char *value)
 {
 	return X509_NAME_add_entry_by_txt(name,field,MBSTRING_UTF8,(const unsigned char*)value,-1,-1,0);
 }
+
+int verify_csr(X509_REQ *csr)
+{
+	EVP_PKEY *pubkey = X509_REQ_get0_pubkey(csr);
+	if(pubkey == NULL)
+		return 0;
+	if(X509_REQ_verify(csr,pubkey) == 1)
+		return 1;
+	return 0;
+}

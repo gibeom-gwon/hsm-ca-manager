@@ -332,6 +332,9 @@ int main(int argc, char *argv[])
 	if((cert_req = load_csr(arg_csr)) == NULL)
 		goto openssl_fail;
 
+	if(!verify_csr(cert_req))
+		goto openssl_fail;
+
 	if(arg_ca_cert != NULL && (ca_cert = load_x509(arg_ca_cert)) == NULL)
 		goto openssl_fail;
 

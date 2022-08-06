@@ -25,5 +25,6 @@ X509_REQ *csr_new();
 X509_NAME *x509_name_new();
 void x509_name_free(X509_NAME *name);
 int x509_name_add_entry(X509_NAME *name, const char *field, const char *value);
+int verify_csr(X509_REQ *csr);
 
 #endif
