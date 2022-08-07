@@ -128,6 +128,82 @@ int set_extension_basic_constraints(X509 *cert, struct basic_constraints basic_c
 	return 1;
 }
 
+int request_extension_basic_constraints(X509_REQ *csr, struct basic_constraints basic_constraints)
+{
+	BASIC_CONSTRAINTS *bcons = BASIC_CONSTRAINTS_new();
+	if(!bcons)
+		return 0;
+	if(basic_constraints.ca == 1)
+		bcons->ca = 1;
+	else
+		bcons->ca = 0;
+	if(basic_constraints.pathlen >= 0)
+	{
+		ASN1_INTEGER *plen = ASN1_INTEGER_new();
+		if(plen == NULL)
+		{
+			BASIC_CONSTRAINTS_free(bcons);
+			return 0;
+		}
+		if(!ASN1_INTEGER_set(plen,basic_constraints.pathlen))
+		{
+			BASIC_CONSTRAINTS_free(bcons);
+			return 0;
+		}
+		bcons->pathlen = plen;
+	}
+
+	X509_EXTENSIONS *exts = X509_REQ_get_extensions(csr);
+// https://github.com/openssl/openssl/pull/18926
+#if OPENSSL_VERSION_NUMBER > 0x1010111FL // OPENSSL_VERSION > 1.1.1q
+	if(exts == NULL)
+	{
+		BASIC_CONSTRAINTS_free(bcons);
+		return 0;
+	}
+#else // OPENSSL_VERSION <= 1.1.1q
+	if(exts == NULL)
+	{
+		exts = sk_X509_EXTENSION_new_null();
+		if(exts == NULL)
+		{
+			BASIC_CONSTRAINTS_free(bcons);
+			return 0;
+		}
+	}
+#endif
+	int ext_req_attr_loc = X509_REQ_get_attr_by_NID(csr,NID_ext_req,-1);
+	if(ext_req_attr_loc != -1)
+	{
+		X509_ATTRIBUTE *attr = X509_REQ_delete_attr(csr,ext_req_attr_loc);
+		if(attr == NULL)
+		{
+			sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
+			BASIC_CONSTRAINTS_free(bcons);
+			return 0;
+		}
+		X509_ATTRIBUTE_free(attr);
+	}
+
+	if(!X509V3_add1_i2d(&exts,NID_basic_constraints,bcons,1,X509V3_ADD_REPLACE))
+	{
+		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
+		BASIC_CONSTRAINTS_free(bcons);
+		return 0;
+	}
+
+	if(!X509_REQ_add_extensions(csr,exts))
+	{
+		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
+		BASIC_CONSTRAINTS_free(bcons);
+		return 0;
+	}
+
+	sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
+	BASIC_CONSTRAINTS_free(bcons);
+	return 1;
+}
+
 int set_extension_key_usage(X509 *cert, unsigned int key_usage)
 {
 	int max_flag = (1 << key_usage_list_num) - 1;

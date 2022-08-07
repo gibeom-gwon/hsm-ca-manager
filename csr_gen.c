@@ -9,6 +9,8 @@ const char *arg_pkcs11_uri = NULL;
 X509_NAME *arg_name_entries = NULL;
 const char *arg_output = NULL;
 
+struct basic_constraints arg_basic_constraints = { .ca = -1, .pathlen = -1 };
+
 int parse_arg_name_entries(char *arg)
 {
 	char *str = strdup(arg);
@@ -59,10 +61,11 @@ void print_help(const char *exec_name)
 
 	printf( "Usage: %s [OPTIONS...]\n\n"
 			"Options:\n"
-			"-p --pkcs11-uri=PKCS11_URI        PKCS11 URI of HSM\n"
-			"-n --name=TYPE:VALUE[,TYPE:VALUE] Set certificate subject name\n"
-			"-o --output=CSR_PATH              Certificate request output path. If not set, print to stdin\n"
-			"-h --help                         Show this help\n",basename);
+			"-p --pkcs11-uri=PKCS11_URI                  PKCS11 URI of HSM\n"
+			"-n --name=TYPE:VALUE[,TYPE:VALUE]           Set certificate subject name\n"
+			"   --basic-constraints=True[:PATHLEN]|False Add basic constraints extension\n"
+			"-o --output=CSR_PATH                        Certificate request output path. If not set, print to stdin\n"
+			"-h --help                                   Show this help\n",basename);
 }
 
 int set_args(int argc, char *argv[])
@@ -70,6 +73,7 @@ int set_args(int argc, char *argv[])
 	struct option opts[] = {
 		{"pkcs11-uri",required_argument,0,'p'},
 		{"name",required_argument,0,'n'},
+		{"basic-constraints",required_argument,0,'b'},
 		{"output",required_argument,0,'o'},
 		{"help",no_argument,0,'h'},
 		{NULL,0,0,0}
@@ -95,6 +99,10 @@ int set_args(int argc, char *argv[])
 					fprintf(stderr,"malformed name entry\n");
 					return 0;
 				}
+				break;
+			case 'b':
+				if(!parse_arg_basic_constraints(optarg,&arg_basic_constraints))
+					return 0;
 				break;
 			case 'o':
 				arg_output = optarg;
@@ -137,6 +145,12 @@ int main(int argc, char *argv[])
 
 	if(!set_subject_name_to_csr(csr,arg_name_entries))
 		goto openssl_fail;
+
+	if(arg_basic_constraints.ca != -1)
+	{
+		if(!request_extension_basic_constraints(csr,arg_basic_constraints))
+			goto openssl_fail;
+	}
 
 	if((privkey = get_privkey_from_hsm(hsm,arg_pkcs11_uri)) == NULL)
 		goto openssl_fail;
