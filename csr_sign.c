@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <string.h>
-#include <errno.h>
 #include "openssl.h"
 #include "ip.h"
 
@@ -20,41 +19,7 @@ const char *arg_output = NULL;
 struct subject_alt_name *arg_subject_alt_name = NULL;
 int arg_subject_alt_name_num = 0;
 
-int arg_extension_basic_constraints_bool = -1;
-long arg_extension_basic_constraints_pathlen = -1;
-
-int parse_arg_basic_constraints(const char *arg)
-{
-	if(strcasecmp(arg,"false") == 0)
-	{
-		arg_extension_basic_constraints_bool = 0;
-		arg_extension_basic_constraints_pathlen = -1;
-	}
-	else if(strcasecmp(arg,"true") >= 0)
-	{
-		arg_extension_basic_constraints_bool = 1;
-		if(arg[4] == 0)
-			arg_extension_basic_constraints_pathlen = -1;
-		else if(arg[4] == ':')
-		{
-			const char *pathlen = arg + 5;
-			char *endptr = NULL;
-			errno = 0;
-			arg_extension_basic_constraints_pathlen = strtol(pathlen,&endptr,10);
-			if(arg_extension_basic_constraints_pathlen < 0 || errno != 0 || *endptr != 0)
-			{
-				fprintf(stderr,"Invalid syntax of --basic-constraints argument\n");
-				return 0;
-			}
-		}
-	}
-	else
-	{
-		fprintf(stderr,"Invalid syntax of --basic-constraints argument\n");
-		return 0;
-	}
-	return 1;
-}
+struct basic_constraints arg_basic_constraints = { .ca = -1, .pathlen = -1 };
 
 int parse_arg_key_usage(const char *arg)
 {
@@ -262,7 +227,7 @@ int set_args(int argc, char *argv[])
 				arg_ignore_requested_extensions = 1;
 				break;
 			case 'b':
-				if(!parse_arg_basic_constraints(optarg))
+				if(!parse_arg_basic_constraints(optarg,&arg_basic_constraints))
 					return 0;
 				break;
 			case 'k':
@@ -278,7 +243,7 @@ int set_args(int argc, char *argv[])
 					return 0;
 				break;
 			case 'r':
-				if(!parse_arg_basic_constraints("True"))
+				if(!parse_arg_basic_constraints("True",&arg_basic_constraints))
 					return 0;
 				if(!parse_arg_key_usage("keyCertSign,cRLSign"))
 					return 0;
@@ -367,9 +332,9 @@ int main(int argc, char *argv[])
 	if(!arg_ignore_requested_extensions && !copy_extensions_from_csr(result_cert,cert_req))
 		goto openssl_fail;
 
-	if(arg_extension_basic_constraints_bool != -1)
+	if(arg_basic_constraints.ca != -1)
 	{
-		if(!set_extension_basic_constraints(result_cert,arg_extension_basic_constraints_bool,arg_extension_basic_constraints_pathlen))
+		if(!set_extension_basic_constraints(result_cert,arg_basic_constraints))
 			goto openssl_fail;
 	}
 

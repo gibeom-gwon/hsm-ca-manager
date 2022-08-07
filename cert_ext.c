@@ -1,4 +1,5 @@
 #include <string.h>
+#include <errno.h>
 #include "cert_ext.h"
 
 struct key_usage_type {
@@ -32,6 +33,39 @@ static struct key_usage_type extended_key_usage_list[] = {
 
 static const int extended_key_usage_list_num = sizeof(extended_key_usage_list) / sizeof(struct key_usage_type);
 
+int parse_arg_basic_constraints(const char *arg, struct basic_constraints *opt)
+{
+	if(strcasecmp(arg,"false") == 0)
+	{
+		opt->ca = 0;
+		opt->pathlen = -1;
+	}
+	else if(strcasecmp(arg,"true") >= 0)
+	{
+		opt->ca = 1;
+		if(arg[4] == 0)
+			opt->pathlen = -1;
+		else if(arg[4] == ':')
+		{
+			const char *pathlen = arg + 5;
+			char *endptr = NULL;
+			errno = 0;
+			opt->pathlen = strtol(pathlen,&endptr,10);
+			if(opt->pathlen < 0 || errno != 0 || *endptr != 0)
+			{
+				fprintf(stderr,"Invalid syntax of --basic-constraints argument\n");
+				return 0;
+			}
+		}
+	}
+	else
+	{
+		fprintf(stderr,"Invalid syntax of --basic-constraints argument\n");
+		return 0;
+	}
+	return 1;
+}
+
 int copy_extensions_from_csr(X509 *cert, X509_REQ *csr)
 {
 	const X509_EXTENSIONS *req_extensions = X509_REQ_get_extensions(csr);
@@ -61,16 +95,16 @@ int copy_extensions_from_csr(X509 *cert, X509_REQ *csr)
 	return 1;
 }
 
-int set_extension_basic_constraints(X509 *cert, int ca, long pathlen)
+int set_extension_basic_constraints(X509 *cert, struct basic_constraints basic_constraints)
 {
 	BASIC_CONSTRAINTS *bcons = BASIC_CONSTRAINTS_new();
 	if(!bcons)
 		return 0;
-	if(ca)
+	if(basic_constraints.ca == 1)
 		bcons->ca = 1;
 	else
 		bcons->ca = 0;
-	if(pathlen >= 0)
+	if(basic_constraints.pathlen >= 0)
 	{
 		ASN1_INTEGER *plen = ASN1_INTEGER_new();
 		if(plen == NULL)
@@ -78,7 +112,7 @@ int set_extension_basic_constraints(X509 *cert, int ca, long pathlen)
 			BASIC_CONSTRAINTS_free(bcons);
 			return 0;
 		}
-		if(!ASN1_INTEGER_set(plen,pathlen))
+		if(!ASN1_INTEGER_set(plen,basic_constraints.pathlen))
 		{
 			BASIC_CONSTRAINTS_free(bcons);
 			return 0;
