@@ -95,6 +95,36 @@ int copy_extensions_from_csr(X509 *cert, X509_REQ *csr)
 	return 1;
 }
 
+X509_EXTENSIONS *get_csr_extensions(X509_REQ *csr)
+{
+	X509_EXTENSIONS *exts = X509_REQ_get_extensions(csr);
+// https://github.com/openssl/openssl/pull/18926
+#if OPENSSL_VERSION_NUMBER > 0x1010111FL // OPENSSL_VERSION > 1.1.1q
+	if(exts == NULL)
+		return NULL;
+#else // OPENSSL_VERSION <= 1.1.1q
+	if(exts == NULL)
+	{
+		exts = sk_X509_EXTENSION_new_null();
+		if(exts == NULL)
+			return NULL;
+	}
+#endif
+}
+
+int remove_csr_extensions(X509_REQ *csr)
+{
+	int ext_req_attr_loc = X509_REQ_get_attr_by_NID(csr,NID_ext_req,-1);
+	if(ext_req_attr_loc != -1)
+	{
+		X509_ATTRIBUTE *attr = X509_REQ_delete_attr(csr,ext_req_attr_loc);
+		if(attr == NULL)
+			return 0;
+		X509_ATTRIBUTE_free(attr);
+	}
+	return 1;
+}
+
 BASIC_CONSTRAINTS *create_basic_constraints_internal(struct basic_constraints basic_constraints)
 {
 	BASIC_CONSTRAINTS *bcons = BASIC_CONSTRAINTS_new();
@@ -137,37 +167,18 @@ int set_extension_basic_constraints(X509 *cert, struct basic_constraints basic_c
 int request_extension_basic_constraints(X509_REQ *csr, struct basic_constraints basic_constraints)
 {
 	BASIC_CONSTRAINTS *bcons = create_basic_constraints_internal(basic_constraints);
-
-	X509_EXTENSIONS *exts = X509_REQ_get_extensions(csr);
-// https://github.com/openssl/openssl/pull/18926
-#if OPENSSL_VERSION_NUMBER > 0x1010111FL // OPENSSL_VERSION > 1.1.1q
+	X509_EXTENSIONS *exts = get_csr_extensions(csr);
 	if(exts == NULL)
 	{
 		BASIC_CONSTRAINTS_free(bcons);
 		return 0;
 	}
-#else // OPENSSL_VERSION <= 1.1.1q
-	if(exts == NULL)
+
+	if(!remove_csr_extensions(csr))
 	{
-		exts = sk_X509_EXTENSION_new_null();
-		if(exts == NULL)
-		{
-			BASIC_CONSTRAINTS_free(bcons);
-			return 0;
-		}
-	}
-#endif
-	int ext_req_attr_loc = X509_REQ_get_attr_by_NID(csr,NID_ext_req,-1);
-	if(ext_req_attr_loc != -1)
-	{
-		X509_ATTRIBUTE *attr = X509_REQ_delete_attr(csr,ext_req_attr_loc);
-		if(attr == NULL)
-		{
-			sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
-			BASIC_CONSTRAINTS_free(bcons);
-			return 0;
-		}
-		X509_ATTRIBUTE_free(attr);
+		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
+		BASIC_CONSTRAINTS_free(bcons);
+		return 0;
 	}
 
 	if(!X509V3_add1_i2d(&exts,NID_basic_constraints,bcons,1,X509V3_ADD_REPLACE))
