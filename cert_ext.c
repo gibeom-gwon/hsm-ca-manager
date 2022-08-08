@@ -110,6 +110,7 @@ X509_EXTENSIONS *get_csr_extensions(X509_REQ *csr)
 			return NULL;
 	}
 #endif
+	return exts;
 }
 
 int remove_csr_extensions(X509_REQ *csr)
