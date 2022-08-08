@@ -66,6 +66,29 @@ int parse_arg_basic_constraints(const char *arg, struct basic_constraints *opt)
 	return 1;
 }
 
+int parse_arg_key_usage(const char *arg)
+{
+	unsigned int flag = 0;
+	char *str = strdup(arg);
+	char *tok = strtok(str,",");
+
+	while(tok != NULL)
+	{
+		int bit = get_extension_key_usage_bit_by_name(tok);
+		if(bit == 0)
+		{
+			fprintf(stderr,"invalid --key-usage argument '%s'.\n",tok);
+			free(str);
+			return 0;
+		}
+		flag |= bit;
+		tok = strtok(NULL,",");
+	}
+	free(str);
+
+	return flag;
+}
+
 int copy_extensions_from_csr(X509 *cert, X509_REQ *csr)
 {
 	const X509_EXTENSIONS *req_extensions = X509_REQ_get_extensions(csr);
