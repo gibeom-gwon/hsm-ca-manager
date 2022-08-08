@@ -95,7 +95,7 @@ int copy_extensions_from_csr(X509 *cert, X509_REQ *csr)
 	return 1;
 }
 
-int set_extension_basic_constraints(X509 *cert, struct basic_constraints basic_constraints)
+BASIC_CONSTRAINTS *create_basic_constraints_internal(struct basic_constraints basic_constraints)
 {
 	BASIC_CONSTRAINTS *bcons = BASIC_CONSTRAINTS_new();
 	if(!bcons)
@@ -119,6 +119,12 @@ int set_extension_basic_constraints(X509 *cert, struct basic_constraints basic_c
 		}
 		bcons->pathlen = plen;
 	}
+	return bcons;
+}
+
+int set_extension_basic_constraints(X509 *cert, struct basic_constraints basic_constraints)
+{
+	BASIC_CONSTRAINTS *bcons = create_basic_constraints_internal(basic_constraints);
 	if(!X509_add1_ext_i2d(cert,NID_basic_constraints,bcons,1,X509V3_ADD_REPLACE))
 	{
 		BASIC_CONSTRAINTS_free(bcons);
@@ -130,28 +136,7 @@ int set_extension_basic_constraints(X509 *cert, struct basic_constraints basic_c
 
 int request_extension_basic_constraints(X509_REQ *csr, struct basic_constraints basic_constraints)
 {
-	BASIC_CONSTRAINTS *bcons = BASIC_CONSTRAINTS_new();
-	if(!bcons)
-		return 0;
-	if(basic_constraints.ca == 1)
-		bcons->ca = 1;
-	else
-		bcons->ca = 0;
-	if(basic_constraints.pathlen >= 0)
-	{
-		ASN1_INTEGER *plen = ASN1_INTEGER_new();
-		if(plen == NULL)
-		{
-			BASIC_CONSTRAINTS_free(bcons);
-			return 0;
-		}
-		if(!ASN1_INTEGER_set(plen,basic_constraints.pathlen))
-		{
-			BASIC_CONSTRAINTS_free(bcons);
-			return 0;
-		}
-		bcons->pathlen = plen;
-	}
+	BASIC_CONSTRAINTS *bcons = create_basic_constraints_internal(basic_constraints);
 
 	X509_EXTENSIONS *exts = X509_REQ_get_extensions(csr);
 // https://github.com/openssl/openssl/pull/18926
