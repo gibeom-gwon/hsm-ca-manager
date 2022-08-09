@@ -10,6 +10,7 @@ X509_NAME *arg_name_entries = NULL;
 const char *arg_output = NULL;
 
 struct basic_constraints arg_basic_constraints = { .ca = -1, .pathlen = -1 };
+unsigned int arg_key_usage_flag = 0;
 
 int parse_arg_name_entries(char *arg)
 {
@@ -64,6 +65,8 @@ void print_help(const char *exec_name)
 			"-p --pkcs11-uri=PKCS11_URI                  PKCS11 URI of HSM\n"
 			"-n --name=TYPE:VALUE[,TYPE:VALUE]           Set certificate subject name\n"
 			"   --basic-constraints=True[:PATHLEN]|False Add basic constraints extension\n"
+			"   --key-usage=KEY_USAGE_TYPE[,KEY_USAGE_TYPE]\n"
+			"                                            Add key usage extension\n"
 			"-o --output=CSR_PATH                        Certificate request output path. If not set, print to stdin\n"
 			"-h --help                                   Show this help\n",basename);
 }
@@ -74,6 +77,7 @@ int set_args(int argc, char *argv[])
 		{"pkcs11-uri",required_argument,0,'p'},
 		{"name",required_argument,0,'n'},
 		{"basic-constraints",required_argument,0,'b'},
+		{"key-usage",required_argument,0,'k'},
 		{"output",required_argument,0,'o'},
 		{"help",no_argument,0,'h'},
 		{NULL,0,0,0}
@@ -103,6 +107,12 @@ int set_args(int argc, char *argv[])
 			case 'b':
 				if(!parse_arg_basic_constraints(optarg,&arg_basic_constraints))
 					return 0;
+				break;
+			case 'k':
+				int key_usage_flag = 0;
+				if(!(key_usage_flag = parse_arg_key_usage(optarg)))
+					return 0;
+				arg_key_usage_flag |= key_usage_flag;
 				break;
 			case 'o':
 				arg_output = optarg;
@@ -151,6 +161,9 @@ int main(int argc, char *argv[])
 		if(!request_extension_basic_constraints(csr,arg_basic_constraints))
 			goto openssl_fail;
 	}
+
+	if(arg_key_usage_flag && !request_extension_key_usage(csr,arg_key_usage_flag))
+		goto openssl_fail;
 
 	if((privkey = get_privkey_from_hsm(hsm,arg_pkcs11_uri)) == NULL)
 		goto openssl_fail;

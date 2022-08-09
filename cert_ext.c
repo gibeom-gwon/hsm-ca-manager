@@ -205,7 +205,7 @@ int request_extension_basic_constraints(X509_REQ *csr, struct basic_constraints 
 		return 0;
 	}
 
-	if(!X509V3_add1_i2d(&exts,NID_basic_constraints,bcons,1,X509V3_ADD_REPLACE))
+	if(X509V3_add1_i2d(&exts,NID_basic_constraints,bcons,1,X509V3_ADD_REPLACE) < 1)
 	{
 		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 		BASIC_CONSTRAINTS_free(bcons);
@@ -224,15 +224,15 @@ int request_extension_basic_constraints(X509_REQ *csr, struct basic_constraints 
 	return 1;
 }
 
-int set_extension_key_usage(X509 *cert, unsigned int key_usage)
+ASN1_BIT_STRING *create_key_usage_internal(unsigned int key_usage)
 {
 	int max_flag = (1 << key_usage_list_num) - 1;
 	if(max_flag < key_usage)
-		return 0;
+		return NULL;
 
 	ASN1_BIT_STRING *bs = ASN1_BIT_STRING_new();
 	if(!bs)
-		return 0;
+		return NULL;
 
 	int bit = 0;
 	while(key_usage)
@@ -242,17 +242,65 @@ int set_extension_key_usage(X509 *cert, unsigned int key_usage)
 			if(!ASN1_BIT_STRING_set_bit(bs,bit,1))
 			{
 				ASN1_BIT_STRING_free(bs);
-				return 0;
+				return NULL;
 			}
 		}
 		key_usage >>= 1;
 		bit++;
 	}
+	return bs;
+}
+
+int set_extension_key_usage(X509 *cert, unsigned int key_usage)
+{
+	ASN1_BIT_STRING *bs = create_key_usage_internal(key_usage);
+	if(bs == NULL)
+		return 0;
+
 	if(X509_add1_ext_i2d(cert,NID_key_usage,bs,1,X509V3_ADD_REPLACE) < 1)
 	{
 		ASN1_BIT_STRING_free(bs);
 		return 0;
 	}
+	ASN1_BIT_STRING_free(bs);
+	return 1;
+}
+
+int request_extension_key_usage(X509_REQ *csr, unsigned int key_usage)
+{
+	ASN1_BIT_STRING *bs = create_key_usage_internal(key_usage);
+	if(bs == NULL)
+		return 0;
+
+	X509_EXTENSIONS *exts = get_csr_extensions(csr);
+	if(exts == NULL)
+	{
+		ASN1_BIT_STRING_free(bs);
+		return 0;
+	}
+
+	if(!remove_csr_extensions(csr))
+	{
+		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
+		ASN1_BIT_STRING_free(bs);
+		return 0;
+	}
+
+	if(X509V3_add1_i2d(&exts,NID_key_usage,bs,1,X509V3_ADD_REPLACE) < 1)
+	{
+		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
+		ASN1_BIT_STRING_free(bs);
+		return 0;
+	}
+
+	if(!X509_REQ_add_extensions(csr,exts))
+	{
+		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
+		ASN1_BIT_STRING_free(bs);
+		return 0;
+	}
+
+	sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 	ASN1_BIT_STRING_free(bs);
 	return 1;
 }
