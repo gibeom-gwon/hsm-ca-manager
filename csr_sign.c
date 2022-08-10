@@ -21,30 +21,6 @@ int arg_subject_alt_name_num = 0;
 
 struct basic_constraints arg_basic_constraints = { .ca = -1, .pathlen = -1 };
 
-int parse_arg_extended_key_usage(const char *arg)
-{
-	unsigned int flag = 0;
-	char *str = strdup(arg);
-	char *tok = strtok(str,",");
-
-	while(tok != NULL)
-	{
-		int bit = get_extension_extended_key_usage_bit_by_name(tok);
-		if(bit == 0)
-		{
-			fprintf(stderr,"invalid --extended-key-usage argument '%s'.\n",tok);
-			free(str);
-			return 0;
-		}
-		flag |= bit;
-		tok = strtok(NULL,",");
-	}
-	free(str);
-
-	arg_extended_key_usage_flag = flag;
-	return 1;
-}
-
 int parse_arg_subject_alt_name(const char *arg)
 {
 	char *str = strdup(arg);
@@ -213,8 +189,10 @@ int set_args(int argc, char *argv[])
 				arg_key_usage_flag |= key_usage_flag;
 				break;
 			case 'K':
-				if(!parse_arg_extended_key_usage(optarg))
+				int extended_key_usage_flag = 0;
+				if(!(extended_key_usage_flag = parse_arg_extended_key_usage(optarg)))
 					return 0;
+				arg_extended_key_usage_flag |= extended_key_usage_flag;
 				break;
 			case 's':
 				if(!parse_arg_subject_alt_name(optarg))
