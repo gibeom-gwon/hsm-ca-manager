@@ -336,13 +336,13 @@ unsigned int get_extension_key_usage_bit_by_name(const char *name)
 	return 0;
 }
 
-int set_extension_extended_key_usage(X509 *cert, unsigned int extended_key_usage)
+EXTENDED_KEY_USAGE *create_extended_key_usage_internal(unsigned int extended_key_usage)
 {
 	int max_flag = (1 << extended_key_usage_list_num) - 1;
 	if(max_flag < extended_key_usage)
-		return 0;
+		return NULL;
 
-	EXTENDED_KEY_USAGE* extku = EXTENDED_KEY_USAGE_new();
+	EXTENDED_KEY_USAGE *extku = EXTENDED_KEY_USAGE_new();
 	int idx = 0;
 	while(extended_key_usage)
 	{
@@ -355,10 +355,60 @@ int set_extension_extended_key_usage(X509 *cert, unsigned int extended_key_usage
 		idx++;
 		extended_key_usage >>= 1;
 	}
+	return extku;
+}
 
-	X509_add1_ext_i2d(cert,NID_ext_key_usage,extku,0,X509V3_ADD_REPLACE);
+int set_extension_extended_key_usage(X509 *cert, unsigned int extended_key_usage)
+{
+	EXTENDED_KEY_USAGE *extku = create_extended_key_usage_internal(extended_key_usage);
+	if(extku == NULL)
+		return 0;
+
+	if(X509_add1_ext_i2d(cert,NID_ext_key_usage,extku,0,X509V3_ADD_REPLACE) < 1)
+	{
+		EXTENDED_KEY_USAGE_free(extku);
+		return 0;
+	}
+
 	EXTENDED_KEY_USAGE_free(extku);
+	return 1;
+}
 
+int request_extension_extended_key_usage(X509_REQ *csr, unsigned int extended_key_usage)
+{
+	EXTENDED_KEY_USAGE *extku = create_extended_key_usage_internal(extended_key_usage);
+	if(extku == NULL)
+		return 0;
+
+	X509_EXTENSIONS *exts = get_csr_extensions(csr);
+	if(exts == NULL)
+	{
+		EXTENDED_KEY_USAGE_free(extku);
+		return 0;
+	}
+
+	if(!remove_csr_extensions(csr))
+	{
+		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
+		EXTENDED_KEY_USAGE_free(extku);
+		return 0;
+	}
+
+	if(X509V3_add1_i2d(&exts,NID_ext_key_usage,extku,0,X509V3_ADD_REPLACE) < 1)
+	{
+		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
+		EXTENDED_KEY_USAGE_free(extku);
+		return 0;
+	}
+
+	if(!X509_REQ_add_extensions(csr,exts))
+	{
+		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
+		EXTENDED_KEY_USAGE_free(extku);
+		return 0;
+	}
+
+	EXTENDED_KEY_USAGE_free(extku);
 	return 1;
 }
 
