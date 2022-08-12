@@ -257,6 +257,21 @@ int remove_csr_extensions(X509_REQ *csr)
 	return 1;
 }
 
+X509_EXTENSIONS *take_csr_extensions(X509_REQ *csr)
+{
+	X509_EXTENSIONS *exts = get_csr_extensions(csr);
+	if(exts == NULL)
+		return NULL;
+
+	if(!remove_csr_extensions(csr))
+	{
+		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
+		return NULL;
+	}
+
+	return exts;
+}
+
 BASIC_CONSTRAINTS *create_basic_constraints_internal(struct basic_constraints basic_constraints)
 {
 	BASIC_CONSTRAINTS *bcons = BASIC_CONSTRAINTS_new();
@@ -299,16 +314,9 @@ int set_extension_basic_constraints(X509 *cert, struct basic_constraints basic_c
 int request_extension_basic_constraints(X509_REQ *csr, struct basic_constraints basic_constraints)
 {
 	BASIC_CONSTRAINTS *bcons = create_basic_constraints_internal(basic_constraints);
-	X509_EXTENSIONS *exts = get_csr_extensions(csr);
+	X509_EXTENSIONS *exts = take_csr_extensions(csr);
 	if(exts == NULL)
 	{
-		BASIC_CONSTRAINTS_free(bcons);
-		return 0;
-	}
-
-	if(!remove_csr_extensions(csr))
-	{
-		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 		BASIC_CONSTRAINTS_free(bcons);
 		return 0;
 	}
@@ -380,16 +388,9 @@ int request_extension_key_usage(X509_REQ *csr, unsigned int key_usage)
 	if(bs == NULL)
 		return 0;
 
-	X509_EXTENSIONS *exts = get_csr_extensions(csr);
+	X509_EXTENSIONS *exts = take_csr_extensions(csr);
 	if(exts == NULL)
 	{
-		ASN1_BIT_STRING_free(bs);
-		return 0;
-	}
-
-	if(!remove_csr_extensions(csr))
-	{
-		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 		ASN1_BIT_STRING_free(bs);
 		return 0;
 	}
@@ -467,16 +468,9 @@ int request_extension_extended_key_usage(X509_REQ *csr, unsigned int extended_ke
 	if(extku == NULL)
 		return 0;
 
-	X509_EXTENSIONS *exts = get_csr_extensions(csr);
+	X509_EXTENSIONS *exts = take_csr_extensions(csr);
 	if(exts == NULL)
 	{
-		EXTENDED_KEY_USAGE_free(extku);
-		return 0;
-	}
-
-	if(!remove_csr_extensions(csr))
-	{
-		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 		EXTENDED_KEY_USAGE_free(extku);
 		return 0;
 	}
@@ -623,16 +617,9 @@ int request_extension_subject_alt_name(X509_REQ *csr, struct subject_alt_name *l
 	if(gens == NULL)
 		return 0;
 
-	X509_EXTENSIONS *exts = get_csr_extensions(csr);
+	X509_EXTENSIONS *exts = take_csr_extensions(csr);
 	if(exts == NULL)
 	{
-		sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
-		return 0;
-	}
-
-	if(!remove_csr_extensions(csr))
-	{
-		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 		sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
 		return 0;
 	}
