@@ -131,7 +131,7 @@ int parse_arg_subject_alt_name(const char *arg, struct subject_alt_name **list, 
 		if(*list == NULL)
 			buff = malloc(sizeof(struct subject_alt_name));
 		else
-			buff = realloc(list,sizeof(struct subject_alt_name) * (*list_num + 1));
+			buff = realloc(*list,sizeof(struct subject_alt_name) * (*list_num + 1));
 
 		if(buff == NULL)
 		{
