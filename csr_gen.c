@@ -12,6 +12,8 @@ const char *arg_output = NULL;
 struct basic_constraints arg_basic_constraints = { .ca = -1, .pathlen = -1 };
 unsigned int arg_key_usage_flag = 0;
 unsigned int arg_extended_key_usage_flag = 0;
+struct subject_alt_name *arg_subject_alt_name = NULL;
+int arg_subject_alt_name_num = 0;
 
 int parse_arg_name_entries(char *arg)
 {
@@ -70,6 +72,8 @@ void print_help(const char *exec_name)
 			"                                            Add key usage extension\n"
 			"   --extended-key-usage=KEY_USAGE_TYPE[,KEY_USAGE_TYPE]\n"
 			"                                            Add extended key usage extension\n"
+			"   --subject-alt-name=TYPE:ALT_NAME[,TYPE:ALT_NAME]\n"
+			"                                            Add subject alt name extension\n"
 			"-o --output=CSR_PATH                        Certificate request output path. If not set, print to stdin\n"
 			"-h --help                                   Show this help\n",basename);
 }
@@ -82,6 +86,7 @@ int set_args(int argc, char *argv[])
 		{"basic-constraints",required_argument,0,'b'},
 		{"key-usage",required_argument,0,'k'},
 		{"extended-key-usage",required_argument,0,'K'},
+		{"subject-alt-name",required_argument,0,'s'},
 		{"output",required_argument,0,'o'},
 		{"help",no_argument,0,'h'},
 		{NULL,0,0,0}
@@ -123,6 +128,10 @@ int set_args(int argc, char *argv[])
 				if(!(extended_key_usage_flag = parse_arg_extended_key_usage(optarg)))
 					return 0;
 				arg_extended_key_usage_flag |= extended_key_usage_flag;
+				break;
+			case 's':
+				if(!parse_arg_subject_alt_name(optarg,&arg_subject_alt_name,&arg_subject_alt_name_num))
+					return 0;
 				break;
 			case 'o':
 				arg_output = optarg;
@@ -176,6 +185,9 @@ int main(int argc, char *argv[])
 		goto openssl_fail;
 
 	if(arg_extended_key_usage_flag && !request_extension_extended_key_usage(csr,arg_extended_key_usage_flag))
+		goto openssl_fail;
+
+	if(arg_subject_alt_name && !request_extension_subject_alt_name(csr,arg_subject_alt_name,arg_subject_alt_name_num))
 		goto openssl_fail;
 
 	if((privkey = get_privkey_from_hsm(hsm,arg_pkcs11_uri)) == NULL)

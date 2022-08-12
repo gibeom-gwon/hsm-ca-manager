@@ -34,6 +34,7 @@ int set_extension_extended_key_usage(X509 *cert, unsigned int extended_key_usage
 int request_extension_extended_key_usage(X509_REQ *csr, unsigned int extended_key_usage);
 unsigned get_extension_extended_key_usage_bit_by_name(const char *name);
 int set_extension_subject_alt_name(X509 *cert, struct subject_alt_name *list,int num);
+int request_extension_subject_alt_name(X509_REQ *csr, struct subject_alt_name *list,int num);
 int set_skid(X509 *cert);
 int set_akid_from_x509_skid(X509 *to, X509 *from);
 
