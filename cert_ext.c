@@ -302,6 +302,9 @@ BASIC_CONSTRAINTS *create_basic_constraints_internal(struct basic_constraints ba
 int set_extension_basic_constraints(X509 *cert, struct basic_constraints basic_constraints)
 {
 	BASIC_CONSTRAINTS *bcons = create_basic_constraints_internal(basic_constraints);
+	if(bcons == NULL)
+		return 0;
+
 	if(!X509_add1_ext_i2d(cert,NID_basic_constraints,bcons,1,X509V3_ADD_REPLACE))
 	{
 		BASIC_CONSTRAINTS_free(bcons);
@@ -314,6 +317,9 @@ int set_extension_basic_constraints(X509 *cert, struct basic_constraints basic_c
 int request_extension_basic_constraints(X509_REQ *csr, struct basic_constraints basic_constraints)
 {
 	BASIC_CONSTRAINTS *bcons = create_basic_constraints_internal(basic_constraints);
+	if(bcons == NULL)
+		return 0;
+
 	X509_EXTENSIONS *exts = take_csr_extensions(csr);
 	if(exts == NULL)
 	{
