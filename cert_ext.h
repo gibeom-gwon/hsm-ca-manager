@@ -22,6 +22,7 @@ struct subject_alt_name {
 int parse_arg_basic_constraints(const char *arg, struct basic_constraints *opt);
 unsigned int parse_arg_key_usage(const char *arg);
 unsigned int parse_arg_extended_key_usage(const char *arg);
+int parse_arg_subject_alt_name(const char *arg, struct subject_alt_name **list, int *list_num);
 
 int copy_extensions_from_csr(X509 *cert, X509_REQ *csr);
 int set_extension_basic_constraints(X509 *cert, struct basic_constraints basic_constraints);

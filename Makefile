@@ -8,7 +8,7 @@ all: $(TARGETS)
 csr_sign: csr_sign.o $(OPENSSL_OBJ) ip.o
 	$(CC) -o $@ $^ $(LDLIBS)
 
-csr_gen: csr_gen.o $(OPENSSL_OBJ)
+csr_gen: csr_gen.o $(OPENSSL_OBJ) ip.o
 	$(CC) -o $@ $^ $(LDLIBS)
 
 clean:

@@ -1,6 +1,7 @@
 #include <string.h>
 #include <errno.h>
 #include "cert_ext.h"
+#include "ip.h"
 
 struct key_usage_type {
 	unsigned int bit;
@@ -108,6 +109,92 @@ unsigned int parse_arg_extended_key_usage(const char *arg)
 	}
 	free(str);
 	return flag;
+}
+
+int parse_arg_subject_alt_name(const char *arg, struct subject_alt_name **list, int *list_num)
+{
+	char *str = strdup(arg);
+	char *saveptr1 = NULL;
+	char *tok = strtok_r(str,",",&saveptr1);
+	while(tok != NULL)
+	{
+		char *saveptr2 = NULL;
+		char *type = strtok_r(tok,":",&saveptr2);
+		char *value = strtok_r(NULL,"",&saveptr2);
+		if(value == NULL)
+		{
+			free(str);
+			return 0;
+		}
+
+		void *buff = NULL;
+		if(*list == NULL)
+			buff = malloc(sizeof(struct subject_alt_name));
+		else
+			buff = realloc(list,sizeof(struct subject_alt_name) * (*list_num + 1));
+
+		if(buff == NULL)
+		{
+			free(str);
+			return 0;
+		}
+		*list = buff;
+		(*list_num)++;
+
+		struct subject_alt_name *san = &(*list)[*list_num - 1];
+		san->value = NULL;
+
+		if(strcasecmp(type,"dns") == 0)
+		{
+			san->type = SAN_TYPE_DNS;
+			san->value = strdup(value);
+		}
+		else if(strcasecmp(type,"EMAIL") == 0)
+		{
+			san->type = SAN_TYPE_EMAIL;
+			san->value = strdup(value);
+		}
+		else if(strcasecmp(type,"URI") == 0)
+		{
+			san->type = SAN_TYPE_URI;
+			san->value = strdup(value);
+		}
+		else if(strcasecmp(type,"IP") == 0)
+		{
+			if(strchr(value,'.'))
+			{
+				san->type = SAN_TYPE_IPV4;
+				san->value = (char*)parse_ipv4(value);
+			}
+			else if(strchr(value,':'))
+			{
+				san->type = SAN_TYPE_IPV6;
+				san->value = (char*)parse_ipv6(value);
+			}
+			else
+			{
+				fprintf(stderr,"invalid IP address syntax\n");
+				return 0;
+			}
+
+			if(san->value == NULL)
+			{
+				fprintf(stderr,"invalid IP address syntax\n");
+				return 0;
+			}
+		}
+		else
+		{
+			fprintf(stderr,"unknown subject alt name type '%s'. Supported types: DNS, EMAIL, URI\n",type);
+			free(str);
+			return 0;
+		}
+
+		tok = strtok_r(NULL,",",&saveptr1);
+	}
+
+	free(str);
+	return 1;
 }
 
 int copy_extensions_from_csr(X509 *cert, X509_REQ *csr)

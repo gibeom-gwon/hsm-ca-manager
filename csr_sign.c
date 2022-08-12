@@ -3,7 +3,6 @@
 #include <getopt.h>
 #include <string.h>
 #include "openssl.h"
-#include "ip.h"
 
 #define PKCS11_URI "pkcs11:manufacturer=www.CardContact.de;id=%10"
 #define DAYS_AFTER_EXPIRE 30
@@ -20,92 +19,6 @@ struct subject_alt_name *arg_subject_alt_name = NULL;
 int arg_subject_alt_name_num = 0;
 
 struct basic_constraints arg_basic_constraints = { .ca = -1, .pathlen = -1 };
-
-int parse_arg_subject_alt_name(const char *arg)
-{
-	char *str = strdup(arg);
-	char *saveptr1 = NULL;
-	char *tok = strtok_r(str,",",&saveptr1);
-	while(tok != NULL)
-	{
-		char *saveptr2 = NULL;
-		char *type = strtok_r(tok,":",&saveptr2);
-		char *value = strtok_r(NULL,"",&saveptr2);
-		if(value == NULL)
-		{
-			free(str);
-			return 0;
-		}
-
-		void *buff = NULL;
-		if(arg_subject_alt_name == NULL)
-			buff = malloc(sizeof(struct subject_alt_name));
-		else
-			buff = realloc(arg_subject_alt_name,sizeof(struct subject_alt_name) * (arg_subject_alt_name_num + 1));
-
-		if(buff == NULL)
-		{
-			free(str);
-			return 0;
-		}
-		arg_subject_alt_name = buff;
-		arg_subject_alt_name_num++;
-
-		struct subject_alt_name *san = &arg_subject_alt_name[arg_subject_alt_name_num - 1];
-		san->value = NULL;
-
-		if(strcasecmp(type,"dns") == 0)
-		{
-			san->type = SAN_TYPE_DNS;
-			san->value = strdup(value);
-		}
-		else if(strcasecmp(type,"EMAIL") == 0)
-		{
-			san->type = SAN_TYPE_EMAIL;
-			san->value = strdup(value);
-		}
-		else if(strcasecmp(type,"URI") == 0)
-		{
-			san->type = SAN_TYPE_URI;
-			san->value = strdup(value);
-		}
-		else if(strcasecmp(type,"IP") == 0)
-		{
-			if(strchr(value,'.'))
-			{
-				san->type = SAN_TYPE_IPV4;
-				san->value = (char*)parse_ipv4(value);
-			}
-			else if(strchr(value,':'))
-			{
-				san->type = SAN_TYPE_IPV6;
-				san->value = (char*)parse_ipv6(value);
-			}
-			else
-			{
-				fprintf(stderr,"invalid IP address syntax\n");
-				return 0;
-			}
-
-			if(san->value == NULL)
-			{
-				fprintf(stderr,"invalid IP address syntax\n");
-				return 0;
-			}
-		}
-		else
-		{
-			fprintf(stderr,"unknown subject alt name type '%s'. Supported types: DNS, EMAIL, URI\n",type);
-			free(str);
-			return 0;
-		}
-
-		tok = strtok_r(NULL,",",&saveptr1);
-	}
-
-	free(str);
-	return 1;
-}
 
 void print_help(const char *exec_name)
 {
@@ -195,7 +108,7 @@ int set_args(int argc, char *argv[])
 				arg_extended_key_usage_flag |= extended_key_usage_flag;
 				break;
 			case 's':
-				if(!parse_arg_subject_alt_name(optarg))
+				if(!parse_arg_subject_alt_name(optarg,&arg_subject_alt_name,&arg_subject_alt_name_num))
 					return 0;
 				break;
 			case 'r':
