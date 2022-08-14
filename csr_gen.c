@@ -172,6 +172,11 @@ int main(int argc, char *argv[])
 	if(!set_pubkey_to_csr(csr,pubkey))
 		goto openssl_fail;
 
+	if(arg_name_entries == NULL)
+	{
+		fprintf(stderr,"Subject name is not set\n");
+		goto fail;
+	}
 	if(!set_subject_name_to_csr(csr,arg_name_entries))
 		goto openssl_fail;
 
