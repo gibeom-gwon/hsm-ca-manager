@@ -700,4 +700,3 @@ int set_akid_from_x509_skid(X509 *to, X509 *from)
 	AUTHORITY_KEYID_free(akid);
 	return 1;
 }
-

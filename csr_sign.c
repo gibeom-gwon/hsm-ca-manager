@@ -132,7 +132,11 @@ int set_args(int argc, char *argv[])
 	}
 
 	if(arg_pkcs11_uri == NULL)
+		arg_pkcs11_uri = getenv("PKCS11_URI");
+
+	if(arg_pkcs11_uri == NULL)
 		arg_pkcs11_uri = PKCS11_URI;
+
 	if(arg_expires < 1)
 		arg_expires = DAYS_AFTER_EXPIRE;
 

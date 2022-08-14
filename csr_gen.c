@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
 #include "openssl.h"
@@ -143,6 +144,9 @@ int set_args(int argc, char *argv[])
 				return 0;
 		}
 	}
+
+	if(arg_pkcs11_uri == NULL)
+		arg_pkcs11_uri = getenv("PKCS11_URI");
 
 	if(arg_pkcs11_uri == NULL)
 		arg_pkcs11_uri = PKCS11_URI;
