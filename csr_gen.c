@@ -3,10 +3,11 @@
 #include <string.h>
 #include <getopt.h>
 #include "openssl.h"
+#include "pkcs11_uri.h"
 
-#define PKCS11_URI "pkcs11:manufacturer=www.CardContact.de;id=%10"
+#define PKCS11_URI_DEFAULT "pkcs11:manufacturer=www.CardContact.de;id=%10"
 
-const char *arg_pkcs11_uri = NULL;
+char *arg_pkcs11_uri = NULL;
 X509_NAME *arg_name_entries = NULL;
 const char *arg_output = NULL;
 
@@ -81,6 +82,8 @@ void print_help(const char *exec_name)
 
 int set_args(int argc, char *argv[])
 {
+	const char *pkcs11_uri_input = NULL;
+
 	struct option opts[] = {
 		{"pkcs11-uri",required_argument,0,'p'},
 		{"name",required_argument,0,'n'},
@@ -100,12 +103,7 @@ int set_args(int argc, char *argv[])
 		switch(r)
 		{
 			case 'p':
-				arg_pkcs11_uri = optarg;
-				if(strncmp(arg_pkcs11_uri,"pkcs11:",7) != 0)
-				{
-					fprintf(stderr,"malformed pkcs11 URI\n");
-					return 0;
-				}
+				pkcs11_uri_input = optarg;
 				break;
 			case 'n':
 				if(!parse_arg_name_entries(optarg))
@@ -145,12 +143,21 @@ int set_args(int argc, char *argv[])
 		}
 	}
 
-	if(arg_pkcs11_uri == NULL)
-		arg_pkcs11_uri = getenv("PKCS11_URI");
+	if(pkcs11_uri_input == NULL)
+		pkcs11_uri_input = getenv("PKCS11_URI");
 
-	if(arg_pkcs11_uri == NULL)
-		arg_pkcs11_uri = PKCS11_URI;
+	if(pkcs11_uri_input == NULL)
+		pkcs11_uri_input = PKCS11_URI_DEFAULT;
 
+	PKCS11_URI *pkcs11_uri = pkcs11_uri_parse(pkcs11_uri_input);
+	if(pkcs11_uri == NULL)
+		return 0;
+
+	arg_pkcs11_uri = pkcs11_uri_to_str(pkcs11_uri);
+	if(arg_pkcs11_uri == NULL)
+		return 0;
+
+	pkcs11_uri_free(pkcs11_uri);
 	return 1;
 }
 
@@ -217,6 +224,8 @@ int main(int argc, char *argv[])
 	}
 
 	cleanup:
+	if(arg_pkcs11_uri)
+		free(arg_pkcs11_uri);
 	if(arg_name_entries)
 		x509_name_free(arg_name_entries);
 	if(pubkey)
