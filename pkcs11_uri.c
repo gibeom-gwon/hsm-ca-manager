@@ -311,7 +311,7 @@ char *pkcs11_uri_to_str(PKCS11_URI *pkcs11)
 	for(unsigned int i = 0;i < pkcs11->path_count;i++)
 	{
 		struct pkcs11_kv *kv = pkcs11->path_list[i];
-		size_t realloc_size = strlen(str) + strlen(kv->key) + strlen(kv->value) + 1;
+		size_t realloc_size = end_idx + strlen(kv->key) + 1 + strlen(kv->value) + 1;
 		if(i != 0)
 			realloc_size++;
 		char *new_str = realloc(str,realloc_size);
@@ -341,7 +341,7 @@ char *pkcs11_uri_to_str(PKCS11_URI *pkcs11)
 	for(unsigned int i = 0;i < pkcs11->query_count;i++)
 	{
 		struct pkcs11_kv *kv = pkcs11->query_list[i];
-		size_t realloc_size = strlen(str) + strlen(kv->key) + strlen(kv->value) + 1;
+		size_t realloc_size = end_idx + strlen(kv->key) + 1 + strlen(kv->value) + 1;
 		if(i != 0)
 			realloc_size++;
 		char *new_str = realloc(str,realloc_size);
@@ -377,7 +377,7 @@ void pkcs11_uri_free(PKCS11_URI *pkcs11)
 		{
 			free(list[i]->key);
 			free(list[i]->value);
-			free(list[i++]);
+			free(list[i]);
 		}
 		free(list);
 	}
@@ -385,11 +385,11 @@ void pkcs11_uri_free(PKCS11_URI *pkcs11)
 	list = pkcs11->query_list;
 	if(list != NULL)
 	{
-		for(unsigned int i = 0;i < pkcs11->path_count;i++)
+		for(unsigned int i = 0;i < pkcs11->query_count;i++)
 		{
 			free(list[i]->key);
 			free(list[i]->value);
-			free(list[i++]);
+			free(list[i]);
 		}
 		free(list);
 	}
