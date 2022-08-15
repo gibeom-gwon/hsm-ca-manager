@@ -17,77 +17,66 @@ struct pkcs11_uri
 	unsigned int query_count;
 };
 
-int add_path(PKCS11_URI *pkcs11, const char *key, const char *value)
+int add_kv_to_list(struct pkcs11_kv ***list , unsigned int *len, const char *key, const char *value)
 {
 	struct pkcs11_kv **new_list = NULL;
+	if(list == NULL)
+		return 0;
 
+	struct pkcs11_kv *kv = malloc(sizeof(struct pkcs11_kv));
+	if(kv == NULL)
+		return 0;
+
+	kv->key = strdup(key);
+	if(kv->key == NULL)
+	{
+		free(kv);
+		return 0;
+	}
+	kv->value = strdup(value);
+	if(kv->value == NULL)
+	{
+		free(kv->key);
+		free(kv);
+		return 0;
+	}
+
+	if(*list == NULL)
+		new_list = malloc(sizeof(struct pkcs11_kv **));
+	else
+		new_list = realloc(*list,sizeof(struct pkcs11_kv **) * (*len + 1));
+	if(new_list == NULL)
+	{
+		free(kv->key);
+		free(kv->value);
+		free(kv);
+		return 0;
+	}
+	*list = new_list;
+
+	(*list)[(*len)++] = kv;
+	return 1;
+}
+
+int add_path(PKCS11_URI *pkcs11, const char *key, const char *value)
+{
 	for(unsigned int i = 0;i < pkcs11->path_count;i++)
 	{
 		if(strcmp(key,pkcs11->path_list[i]->key) == 0)
 			return 0;
 	}
 
-	if(pkcs11->path_list == NULL)
-		new_list = malloc(sizeof(struct pkcs11_kv **));
-	else
-		new_list = realloc(pkcs11->path_list,sizeof(struct pkcs11_kv **) * (pkcs11->path_count + 1));
-	if(new_list == NULL)
-		return 0;
-	pkcs11->path_list = new_list;
-
-	struct pkcs11_kv *kv = malloc(sizeof(struct pkcs11_kv));
-	if(kv == NULL)
+	if(!add_kv_to_list(&pkcs11->path_list,&pkcs11->path_count,key,value))
 		return 0;
 
-	kv->key = strdup(key);
-	if(kv->key == NULL)
-	{
-		free(kv);
-		return 0;
-	}
-	kv->value = strdup(value);
-	if(kv->value == NULL)
-	{
-		free(kv->key);
-		free(kv);
-		return 0;
-	}
-
-	pkcs11->path_list[pkcs11->path_count++] = kv;
 	return 1;
 }
 
 int add_query(PKCS11_URI *pkcs11, const char *key, const char *value)
 {
-	struct pkcs11_kv **new_list = NULL;
-
-	if(pkcs11->query_list == NULL)
-		new_list = malloc(sizeof(struct pkcs11_kv **));
-	else
-		new_list = realloc(pkcs11->query_list,sizeof(struct pkcs11_kv **) * (pkcs11->query_count + 1));
-	if(new_list == NULL)
-		return 0;
-	pkcs11->query_list = new_list;
-
-	struct pkcs11_kv *kv = malloc(sizeof(struct pkcs11_kv));
-	if(kv == NULL)
+	if(!add_kv_to_list(&pkcs11->query_list,&pkcs11->query_count,key,value))
 		return 0;
 
-	kv->key = strdup(key);
-	if(kv->key == NULL)
-	{
-		free(kv);
-		return 0;
-	}
-	kv->value = strdup(value);
-	if(kv->value == NULL)
-	{
-		free(kv->key);
-		free(kv);
-		return 0;
-	}
-
-	pkcs11->query_list[pkcs11->query_count++] = kv;
 	return 1;
 }
 
