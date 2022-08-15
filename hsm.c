@@ -21,13 +21,13 @@ ENGINE *hsm_init()
 		ENGINE_free(engine);
 		return NULL;
 	}
+	ENGINE_free(engine);
 	return engine;
 }
 
 void hsm_free(ENGINE *engine)
 {
 	ENGINE_finish(engine);
-	ENGINE_free(engine);
 }
 
 EVP_PKEY *get_privkey_from_hsm(ENGINE *engine, const char *pkcs11_uri)
