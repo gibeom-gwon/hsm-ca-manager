@@ -4,8 +4,11 @@ ENGINE *hsm_init()
 {
 	ENGINE *engine = NULL;
 
+// https://github.com/openssl/openssl/pull/11543
+#if OPENSSL_VERSION_NUMBER < 0x30000000L // OPENSSL_VERSION < 3.0.0
 	if(!OPENSSL_init_crypto(OPENSSL_INIT_ENGINE_DYNAMIC, NULL))
 		return NULL;
+#endif
 	if((engine = ENGINE_by_id("pkcs11")) == NULL)
 		return NULL;
 
