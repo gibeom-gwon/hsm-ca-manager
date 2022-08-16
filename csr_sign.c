@@ -135,6 +135,9 @@ int set_args(int argc, char *argv[])
 		}
 	}
 
+	if(arg_pin == NULL)
+		arg_pin = getenv("PKCS11_PIN");
+
 	if(pkcs11_uri_input == NULL)
 		pkcs11_uri_input = getenv("PKCS11_URI");
 
