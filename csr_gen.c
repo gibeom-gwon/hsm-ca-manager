@@ -8,6 +8,7 @@
 #define PKCS11_URI_DEFAULT "pkcs11:manufacturer=www.CardContact.de;id=%10"
 
 char *arg_pkcs11_uri = NULL;
+const char *arg_pin = NULL;
 X509_NAME *arg_name_entries = NULL;
 const char *arg_output = NULL;
 
@@ -68,6 +69,7 @@ void print_help(const char *exec_name)
 	printf( "Usage: %s [OPTIONS...]\n\n"
 			"Options:\n"
 			"-p --pkcs11-uri=PKCS11_URI                  PKCS11 URI of HSM\n"
+			"   --pin=PIN                                Pin of HSM\n"
 			"-n --name=TYPE:VALUE[,TYPE:VALUE]           Set certificate subject name\n"
 			"   --basic-constraints=True[:PATHLEN]|False Add basic constraints extension\n"
 			"   --key-usage=KEY_USAGE_TYPE[,KEY_USAGE_TYPE]\n"
@@ -86,6 +88,7 @@ int set_args(int argc, char *argv[])
 
 	struct option opts[] = {
 		{"pkcs11-uri",required_argument,0,'p'},
+		{"pin",required_argument,0,'P'},
 		{"name",required_argument,0,'n'},
 		{"basic-constraints",required_argument,0,'b'},
 		{"key-usage",required_argument,0,'k'},
@@ -104,6 +107,9 @@ int set_args(int argc, char *argv[])
 		{
 			case 'p':
 				pkcs11_uri_input = optarg;
+				break;
+			case 'P':
+				arg_pin = optarg;
 				break;
 			case 'n':
 				if(!parse_arg_name_entries(optarg))
@@ -152,6 +158,12 @@ int set_args(int argc, char *argv[])
 	PKCS11_URI *pkcs11_uri = pkcs11_uri_parse(pkcs11_uri_input);
 	if(pkcs11_uri == NULL)
 		return 0;
+
+	if(arg_pin)
+	{
+		if(!pkcs11_uri_set_pin(pkcs11_uri,arg_pin))
+			return 0;
+	}
 
 	arg_pkcs11_uri = pkcs11_uri_to_str(pkcs11_uri);
 	if(arg_pkcs11_uri == NULL)

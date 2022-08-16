@@ -9,6 +9,7 @@
 #define DAYS_AFTER_EXPIRE 30
 
 char *arg_pkcs11_uri = NULL;
+const char *arg_pin = NULL;
 int arg_expires = 0;
 int arg_ignore_requested_extensions = 0;
 unsigned int arg_key_usage_flag = 0;
@@ -32,6 +33,7 @@ void print_help(const char *exec_name)
 	printf( "Usage: %s [OPTIONS...]\n\n"
 			"Options:\n"
 			"-p --pkcs11-uri=PKCS11_URI                  PKCS11 URI of HSM\n"
+			"   --pin=PIN                                Pin of HSM\n"
 			"-e --expires=DAYS                           Expire certificate after DAYS days\n"
 			"-c --ca-cert=CA_CERT_PATH                   PEM certificate file path of CA. If not set,\n"
 			"                                            create self signed certificate\n"
@@ -56,6 +58,7 @@ int set_args(int argc, char *argv[])
 
 	struct option opts[] = {
 		{"pkcs11-uri",required_argument,0,'p'},
+		{"pin",required_argument,0,'P'},
 		{"expires",required_argument,0,'e'},
 		{"ca-cert",required_argument,0,'c'},
 		{"basic-constraints",required_argument,0,'b'},
@@ -77,6 +80,9 @@ int set_args(int argc, char *argv[])
 		{
 			case 'p':
 				pkcs11_uri_input = optarg;
+				break;
+			case 'P':
+				arg_pin = optarg;
 				break;
 			case 'e':
 				arg_expires = atoi(optarg);
@@ -138,6 +144,12 @@ int set_args(int argc, char *argv[])
 	PKCS11_URI *pkcs11_uri = pkcs11_uri_parse(pkcs11_uri_input);
 	if(pkcs11_uri == NULL)
 		return 0;
+
+	if(arg_pin)
+	{
+		if(!pkcs11_uri_set_pin(pkcs11_uri,arg_pin))
+			return 0;
+	}
 
 	arg_pkcs11_uri = pkcs11_uri_to_str(pkcs11_uri);
 	if(arg_pkcs11_uri == NULL)

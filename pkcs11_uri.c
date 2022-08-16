@@ -357,6 +357,11 @@ char *pkcs11_uri_to_str(PKCS11_URI *pkcs11)
 	return str;
 }
 
+int pkcs11_uri_set_pin(PKCS11_URI *pkcs11, const char *pin)
+{
+	return add_query(pkcs11,"pin-value",pin);
+}
+
 void pkcs11_uri_free(PKCS11_URI *pkcs11)
 {
 	struct pkcs11_kv **list = pkcs11->path_list;
