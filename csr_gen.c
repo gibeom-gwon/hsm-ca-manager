@@ -8,7 +8,7 @@
 #define PKCS11_URI_DEFAULT "pkcs11:manufacturer=www.CardContact.de;id=%10"
 
 char *arg_pkcs11_uri = NULL;
-const char *arg_pin = NULL;
+const char *arg_pkcs11_pin = NULL;
 X509_NAME *arg_name_entries = NULL;
 const char *arg_output = NULL;
 
@@ -109,7 +109,7 @@ int set_args(int argc, char *argv[])
 				pkcs11_uri_input = optarg;
 				break;
 			case 'P':
-				arg_pin = optarg;
+				arg_pkcs11_pin = optarg;
 				break;
 			case 'n':
 				if(!parse_arg_name_entries(optarg))
@@ -149,8 +149,8 @@ int set_args(int argc, char *argv[])
 		}
 	}
 
-	if(arg_pin == NULL)
-		arg_pin = getenv("PKCS11_PIN");
+	if(arg_pkcs11_pin == NULL)
+		arg_pkcs11_pin = getenv("PKCS11_PIN");
 
 	if(pkcs11_uri_input == NULL)
 		pkcs11_uri_input = getenv("PKCS11_URI");
@@ -162,9 +162,9 @@ int set_args(int argc, char *argv[])
 	if(pkcs11_uri == NULL)
 		return 0;
 
-	if(arg_pin)
+	if(arg_pkcs11_pin)
 	{
-		if(!pkcs11_uri_set_pin(pkcs11_uri,arg_pin))
+		if(!pkcs11_uri_set_pin(pkcs11_uri,arg_pkcs11_pin))
 			return 0;
 	}
 

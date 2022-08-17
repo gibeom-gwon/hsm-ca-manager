@@ -9,7 +9,7 @@
 #define DAYS_AFTER_EXPIRE 30
 
 char *arg_pkcs11_uri = NULL;
-const char *arg_pin = NULL;
+const char *arg_pkcs11_pin = NULL;
 int arg_expires = 0;
 int arg_ignore_requested_extensions = 0;
 unsigned int arg_key_usage_flag = 0;
@@ -82,7 +82,7 @@ int set_args(int argc, char *argv[])
 				pkcs11_uri_input = optarg;
 				break;
 			case 'P':
-				arg_pin = optarg;
+				arg_pkcs11_pin = optarg;
 				break;
 			case 'e':
 				arg_expires = atoi(optarg);
@@ -135,8 +135,8 @@ int set_args(int argc, char *argv[])
 		}
 	}
 
-	if(arg_pin == NULL)
-		arg_pin = getenv("PKCS11_PIN");
+	if(arg_pkcs11_pin == NULL)
+		arg_pkcs11_pin = getenv("PKCS11_PIN");
 
 	if(pkcs11_uri_input == NULL)
 		pkcs11_uri_input = getenv("PKCS11_URI");
@@ -148,9 +148,9 @@ int set_args(int argc, char *argv[])
 	if(pkcs11_uri == NULL)
 		return 0;
 
-	if(arg_pin)
+	if(arg_pkcs11_pin)
 	{
-		if(!pkcs11_uri_set_pin(pkcs11_uri,arg_pin))
+		if(!pkcs11_uri_set_pin(pkcs11_uri,arg_pkcs11_pin))
 			return 0;
 	}
 
