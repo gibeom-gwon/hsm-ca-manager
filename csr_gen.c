@@ -117,11 +117,6 @@ int set_args(int argc, char *argv[])
 				break;
 			case 'I':
 				pkcs11_id_hexstring = optarg;
-				if(!is_hexstring(pkcs11_id_hexstring))
-				{
-					fprintf(stderr,"Invalid PKCS11 id hexstring\n");
-					return 0;
-				}
 				break;
 			case 'n':
 				if(!parse_arg_name_entries(optarg))
@@ -180,8 +175,16 @@ int set_args(int argc, char *argv[])
 			return 0;
 	}
 
+	if(pkcs11_id_hexstring == NULL)
+		pkcs11_id_hexstring = getenv("PKCS11_ID");
+
 	if(pkcs11_id_hexstring)
 	{
+		if(!is_hexstring(pkcs11_id_hexstring))
+		{
+			fprintf(stderr,"Invalid PKCS11 id hexstring\n");
+			return 0;
+		}
 		char *pkcs11_id_uri_encoded = hexstring_to_uri_encoded(pkcs11_id_hexstring);
 		if(pkcs11_id_uri_encoded == NULL)
 			return 0;
