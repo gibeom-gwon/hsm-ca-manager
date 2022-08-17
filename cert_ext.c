@@ -197,9 +197,29 @@ int parse_arg_subject_alt_name(const char *arg, struct subject_alt_name **list, 
 	return 1;
 }
 
+X509_EXTENSIONS *get_csr_extensions(X509_REQ *csr)
+{
+	X509_EXTENSIONS *exts = X509_REQ_get_extensions(csr);
+// https://github.com/openssl/openssl/pull/18926
+#if OPENSSL_VERSION_NUMBER > 0x1010111FL // OPENSSL_VERSION > 1.1.1q
+	if(exts == NULL)
+		return NULL;
+#else // OPENSSL_VERSION <= 1.1.1q
+	if(exts == NULL)
+	{
+		exts = sk_X509_EXTENSION_new_null();
+		if(exts == NULL)
+			return NULL;
+	}
+#endif
+	return exts;
+}
+
 int copy_extensions_from_csr(X509 *cert, X509_REQ *csr)
 {
-	const X509_EXTENSIONS *req_extensions = X509_REQ_get_extensions(csr);
+	X509_EXTENSIONS *req_extensions = get_csr_extensions(csr);
+	if(req_extensions == NULL)
+		return 0;
 	int extension_num = sk_X509_EXTENSION_num(req_extensions);
 	int *extension_nid_list = malloc(sizeof(int) * extension_num);
 
@@ -223,25 +243,8 @@ int copy_extensions_from_csr(X509 *cert, X509_REQ *csr)
 	}
 
 	free(extension_nid_list);
+	sk_X509_EXTENSION_pop_free(req_extensions,X509_EXTENSION_free);
 	return 1;
-}
-
-X509_EXTENSIONS *get_csr_extensions(X509_REQ *csr)
-{
-	X509_EXTENSIONS *exts = X509_REQ_get_extensions(csr);
-// https://github.com/openssl/openssl/pull/18926
-#if OPENSSL_VERSION_NUMBER > 0x1010111FL // OPENSSL_VERSION > 1.1.1q
-	if(exts == NULL)
-		return NULL;
-#else // OPENSSL_VERSION <= 1.1.1q
-	if(exts == NULL)
-	{
-		exts = sk_X509_EXTENSION_new_null();
-		if(exts == NULL)
-			return NULL;
-	}
-#endif
-	return exts;
 }
 
 int remove_csr_extensions(X509_REQ *csr)
