@@ -362,6 +362,11 @@ int pkcs11_uri_set_pin(PKCS11_URI *pkcs11, const char *pin)
 	return add_query(pkcs11,"pin-value",pin);
 }
 
+int pkcs11_uri_set_id(PKCS11_URI *pkcs11, const char *id)
+{
+	return add_path(pkcs11,"id",id);
+}
+
 void pkcs11_uri_free(PKCS11_URI *pkcs11)
 {
 	struct pkcs11_kv **list = pkcs11->path_list;

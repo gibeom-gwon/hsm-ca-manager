@@ -6,6 +6,7 @@ typedef struct pkcs11_uri PKCS11_URI;
 PKCS11_URI *pkcs11_uri_parse(const char *uri_string);
 char *pkcs11_uri_to_str(PKCS11_URI *pkcs11);
 int pkcs11_uri_set_pin(PKCS11_URI *pkcs11, const char *pin);
+int pkcs11_uri_set_id(PKCS11_URI *pkcs11, const char *id);
 void pkcs11_uri_free(PKCS11_URI *pkcs11);
 
 #endif

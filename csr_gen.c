@@ -4,6 +4,7 @@
 #include <getopt.h>
 #include "openssl.h"
 #include "pkcs11_uri.h"
+#include "hexstring.h"
 
 #define PKCS11_URI_DEFAULT "pkcs11:manufacturer=www.CardContact.de;id=%10"
 
@@ -70,6 +71,7 @@ void print_help(const char *exec_name)
 			"Options:\n"
 			"-p --pkcs11-uri=PKCS11_URI                  PKCS11 URI of HSM\n"
 			"   --pin=PIN                                Pin of HSM\n"
+			"   --id=HEXSTRING                           Id of HSM\n"
 			"-n --name=TYPE:VALUE[,TYPE:VALUE]           Set certificate subject name\n"
 			"   --basic-constraints=True[:PATHLEN]|False Add basic constraints extension\n"
 			"   --key-usage=KEY_USAGE_TYPE[,KEY_USAGE_TYPE]\n"
@@ -85,10 +87,12 @@ void print_help(const char *exec_name)
 int set_args(int argc, char *argv[])
 {
 	const char *pkcs11_uri_input = NULL;
+	const char *pkcs11_id_hexstring = NULL;
 
 	struct option opts[] = {
 		{"pkcs11-uri",required_argument,0,'p'},
 		{"pin",required_argument,0,'P'},
+		{"id",required_argument,0,'I'},
 		{"name",required_argument,0,'n'},
 		{"basic-constraints",required_argument,0,'b'},
 		{"key-usage",required_argument,0,'k'},
@@ -110,6 +114,14 @@ int set_args(int argc, char *argv[])
 				break;
 			case 'P':
 				arg_pkcs11_pin = optarg;
+				break;
+			case 'I':
+				pkcs11_id_hexstring = optarg;
+				if(!is_hexstring(pkcs11_id_hexstring))
+				{
+					fprintf(stderr,"Invalid PKCS11 id hexstring\n");
+					return 0;
+				}
 				break;
 			case 'n':
 				if(!parse_arg_name_entries(optarg))
@@ -166,6 +178,16 @@ int set_args(int argc, char *argv[])
 	{
 		if(!pkcs11_uri_set_pin(pkcs11_uri,arg_pkcs11_pin))
 			return 0;
+	}
+
+	if(pkcs11_id_hexstring)
+	{
+		char *pkcs11_id_uri_encoded = hexstring_to_uri_encoded(pkcs11_id_hexstring);
+		if(pkcs11_id_uri_encoded == NULL)
+			return 0;
+		if(!pkcs11_uri_set_id(pkcs11_uri,pkcs11_id_uri_encoded))
+			return 0;
+		free(pkcs11_id_uri_encoded);
 	}
 
 	arg_pkcs11_uri = pkcs11_uri_to_str(pkcs11_uri);

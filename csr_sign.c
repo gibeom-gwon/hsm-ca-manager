@@ -4,6 +4,7 @@
 #include <string.h>
 #include "openssl.h"
 #include "pkcs11_uri.h"
+#include "hexstring.h"
 
 #define PKCS11_URI_DEFAULT "pkcs11:manufacturer=www.CardContact.de;id=%10"
 #define DAYS_AFTER_EXPIRE 30
@@ -34,6 +35,7 @@ void print_help(const char *exec_name)
 			"Options:\n"
 			"-p --pkcs11-uri=PKCS11_URI                  PKCS11 URI of HSM\n"
 			"   --pin=PIN                                Pin of HSM\n"
+			"   --id=HEXSTRING                           Id of HSM\n"
 			"-e --expires=DAYS                           Expire certificate after DAYS days\n"
 			"-c --ca-cert=CA_CERT_PATH                   PEM certificate file path of CA. If not set,\n"
 			"                                            create self signed certificate\n"
@@ -55,10 +57,12 @@ void print_help(const char *exec_name)
 int set_args(int argc, char *argv[])
 {
 	const char *pkcs11_uri_input = NULL;
+	const char *pkcs11_id_hexstring = NULL;
 
 	struct option opts[] = {
 		{"pkcs11-uri",required_argument,0,'p'},
 		{"pin",required_argument,0,'P'},
+		{"id",required_argument,0,'I'},
 		{"expires",required_argument,0,'e'},
 		{"ca-cert",required_argument,0,'c'},
 		{"basic-constraints",required_argument,0,'b'},
@@ -83,6 +87,14 @@ int set_args(int argc, char *argv[])
 				break;
 			case 'P':
 				arg_pkcs11_pin = optarg;
+				break;
+			case 'I':
+				pkcs11_id_hexstring = optarg;
+				if(!is_hexstring(pkcs11_id_hexstring))
+				{
+					fprintf(stderr,"Invalid PKCS11 id hexstring\n");
+					return 0;
+				}
 				break;
 			case 'e':
 				arg_expires = atoi(optarg);
@@ -152,6 +164,16 @@ int set_args(int argc, char *argv[])
 	{
 		if(!pkcs11_uri_set_pin(pkcs11_uri,arg_pkcs11_pin))
 			return 0;
+	}
+
+	if(pkcs11_id_hexstring)
+	{
+		char *pkcs11_id_uri_encoded = hexstring_to_uri_encoded(pkcs11_id_hexstring);
+		if(pkcs11_id_uri_encoded == NULL)
+			return 0;
+		if(!pkcs11_uri_set_id(pkcs11_uri,pkcs11_id_uri_encoded))
+			return 0;
+		free(pkcs11_id_uri_encoded);
 	}
 
 	arg_pkcs11_uri = pkcs11_uri_to_str(pkcs11_uri);
