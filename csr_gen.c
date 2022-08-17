@@ -172,7 +172,10 @@ int set_args(int argc, char *argv[])
 	if(arg_pkcs11_pin)
 	{
 		if(!pkcs11_uri_set_pin(pkcs11_uri,arg_pkcs11_pin))
+		{
+			pkcs11_uri_free(pkcs11_uri);
 			return 0;
+		}
 	}
 
 	if(pkcs11_id_hexstring == NULL)
@@ -183,19 +186,30 @@ int set_args(int argc, char *argv[])
 		if(!is_hexstring(pkcs11_id_hexstring))
 		{
 			fprintf(stderr,"Invalid PKCS11 id hexstring\n");
+			pkcs11_uri_free(pkcs11_uri);
 			return 0;
 		}
 		char *pkcs11_id_uri_encoded = hexstring_to_uri_encoded(pkcs11_id_hexstring);
 		if(pkcs11_id_uri_encoded == NULL)
+		{
+			pkcs11_uri_free(pkcs11_uri);
 			return 0;
+		}
 		if(!pkcs11_uri_set_id(pkcs11_uri,pkcs11_id_uri_encoded))
+		{
+			free(pkcs11_id_uri_encoded);
+			pkcs11_uri_free(pkcs11_uri);
 			return 0;
+		}
 		free(pkcs11_id_uri_encoded);
 	}
 
 	arg_pkcs11_uri = pkcs11_uri_to_str(pkcs11_uri);
 	if(arg_pkcs11_uri == NULL)
+	{
+		pkcs11_uri_free(pkcs11_uri);
 		return 0;
+	}
 
 	pkcs11_uri_free(pkcs11_uri);
 	return 1;
