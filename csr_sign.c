@@ -11,6 +11,7 @@
 
 char *arg_pkcs11_uri = NULL;
 const char *arg_pkcs11_pin = NULL;
+const char *arg_pkcs11_serial = NULL;
 int arg_expires = 0;
 int arg_ignore_requested_extensions = 0;
 unsigned int arg_key_usage_flag = 0;
@@ -36,6 +37,7 @@ void print_help(const char *exec_name)
 			"-p --pkcs11-uri=PKCS11_URI                  PKCS11 URI of HSM\n"
 			"   --pin=PIN                                Pin of HSM\n"
 			"   --id=HEXSTRING                           Id of HSM\n"
+			"   --serial=SERIAL                          Serial of HSM\n"
 			"-e --expires=DAYS                           Expire certificate after DAYS days\n"
 			"-c --ca-cert=CA_CERT_PATH                   PEM certificate file path of CA. If not set,\n"
 			"                                            create self signed certificate\n"
@@ -63,6 +65,7 @@ int set_args(int argc, char *argv[])
 		{"pkcs11-uri",required_argument,0,'p'},
 		{"pin",required_argument,0,'P'},
 		{"id",required_argument,0,'I'},
+		{"serial",required_argument,0,'S'},
 		{"expires",required_argument,0,'e'},
 		{"ca-cert",required_argument,0,'c'},
 		{"basic-constraints",required_argument,0,'b'},
@@ -90,6 +93,9 @@ int set_args(int argc, char *argv[])
 				break;
 			case 'I':
 				pkcs11_id_hexstring = optarg;
+				break;
+			case 'S':
+				arg_pkcs11_serial = optarg;
 				break;
 			case 'e':
 				arg_expires = atoi(optarg);
@@ -145,6 +151,9 @@ int set_args(int argc, char *argv[])
 	if(arg_pkcs11_pin == NULL)
 		arg_pkcs11_pin = getenv("PKCS11_PIN");
 
+	if(arg_pkcs11_serial == NULL)
+		arg_pkcs11_serial = getenv("PKCS11_SERIAL");
+
 	if(pkcs11_uri_input == NULL)
 		pkcs11_uri_input = getenv("PKCS11_URI");
 
@@ -158,6 +167,15 @@ int set_args(int argc, char *argv[])
 	if(arg_pkcs11_pin)
 	{
 		if(!pkcs11_uri_set_pin(pkcs11_uri,arg_pkcs11_pin))
+		{
+			pkcs11_uri_free(pkcs11_uri);
+			return 0;
+		}
+	}
+
+	if(arg_pkcs11_serial)
+	{
+		if(!pkcs11_uri_set_serial(pkcs11_uri,arg_pkcs11_serial))
 		{
 			pkcs11_uri_free(pkcs11_uri);
 			return 0;

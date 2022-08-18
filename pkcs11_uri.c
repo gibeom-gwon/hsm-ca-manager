@@ -367,6 +367,11 @@ int pkcs11_uri_set_id(PKCS11_URI *pkcs11, const char *id)
 	return add_path(pkcs11,"id",id);
 }
 
+int pkcs11_uri_set_serial(PKCS11_URI *pkcs11, const char *serial)
+{
+	return add_path(pkcs11,"serial",serial);
+}
+
 void pkcs11_uri_free(PKCS11_URI *pkcs11)
 {
 	struct pkcs11_kv **list = pkcs11->path_list;

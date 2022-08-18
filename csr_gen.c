@@ -10,6 +10,7 @@
 
 char *arg_pkcs11_uri = NULL;
 const char *arg_pkcs11_pin = NULL;
+const char *arg_pkcs11_serial = NULL;
 X509_NAME *arg_name_entries = NULL;
 const char *arg_output = NULL;
 
@@ -72,6 +73,7 @@ void print_help(const char *exec_name)
 			"-p --pkcs11-uri=PKCS11_URI                  PKCS11 URI of HSM\n"
 			"   --pin=PIN                                Pin of HSM\n"
 			"   --id=HEXSTRING                           Id of HSM\n"
+			"   --serial=SERIAL                          Serial of HSM\n"
 			"-n --name=TYPE:VALUE[,TYPE:VALUE]           Set certificate subject name\n"
 			"   --basic-constraints=True[:PATHLEN]|False Add basic constraints extension\n"
 			"   --key-usage=KEY_USAGE_TYPE[,KEY_USAGE_TYPE]\n"
@@ -93,6 +95,7 @@ int set_args(int argc, char *argv[])
 		{"pkcs11-uri",required_argument,0,'p'},
 		{"pin",required_argument,0,'P'},
 		{"id",required_argument,0,'I'},
+		{"serial",required_argument,0,'S'},
 		{"name",required_argument,0,'n'},
 		{"basic-constraints",required_argument,0,'b'},
 		{"key-usage",required_argument,0,'k'},
@@ -117,6 +120,9 @@ int set_args(int argc, char *argv[])
 				break;
 			case 'I':
 				pkcs11_id_hexstring = optarg;
+				break;
+			case 'S':
+				arg_pkcs11_serial = optarg;
 				break;
 			case 'n':
 				if(!parse_arg_name_entries(optarg))
@@ -159,6 +165,9 @@ int set_args(int argc, char *argv[])
 	if(arg_pkcs11_pin == NULL)
 		arg_pkcs11_pin = getenv("PKCS11_PIN");
 
+	if(arg_pkcs11_serial == NULL)
+		arg_pkcs11_serial = getenv("PKCS11_SERIAL");
+
 	if(pkcs11_uri_input == NULL)
 		pkcs11_uri_input = getenv("PKCS11_URI");
 
@@ -172,6 +181,14 @@ int set_args(int argc, char *argv[])
 	if(arg_pkcs11_pin)
 	{
 		if(!pkcs11_uri_set_pin(pkcs11_uri,arg_pkcs11_pin))
+		{
+			pkcs11_uri_free(pkcs11_uri);
+			return 0;
+		}
+	}
+	if(arg_pkcs11_serial)
+	{
+		if(!pkcs11_uri_set_serial(pkcs11_uri,arg_pkcs11_serial))
 		{
 			pkcs11_uri_free(pkcs11_uri);
 			return 0;
