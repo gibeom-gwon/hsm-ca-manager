@@ -6,8 +6,6 @@
 #include "pkcs11_uri.h"
 #include "hexstring.h"
 
-#define PKCS11_URI_DEFAULT "pkcs11:manufacturer=www.CardContact.de;id=%10"
-
 char *arg_pkcs11_uri = NULL;
 const char *arg_pkcs11_pin = NULL;
 const char *arg_pkcs11_serial = NULL;
@@ -172,7 +170,7 @@ int set_args(int argc, char *argv[])
 		pkcs11_uri_input = getenv("PKCS11_URI");
 
 	if(pkcs11_uri_input == NULL)
-		pkcs11_uri_input = PKCS11_URI_DEFAULT;
+		pkcs11_uri_input = "pkcs11:";
 
 	PKCS11_URI *pkcs11_uri = pkcs11_uri_parse(pkcs11_uri_input);
 	if(pkcs11_uri == NULL)
