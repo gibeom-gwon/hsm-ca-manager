@@ -254,6 +254,9 @@ PKCS11_URI *pkcs11_uri_parse(const char *uri_string)
 		return NULL;
 
 	pkcs11 = malloc(sizeof(struct pkcs11_uri));
+	if(pkcs11 == NULL)
+		return NULL;
+
 	pkcs11->path_list = NULL;
 	pkcs11->path_count = 0;
 	pkcs11->query_list = NULL;

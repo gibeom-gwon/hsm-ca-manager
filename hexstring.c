@@ -35,6 +35,9 @@ char *hexstring_to_uri_encoded(const char *str)
 	alloc_size++;
 
 	char *result = malloc(alloc_size);
+	if(result == NULL)
+		return NULL;
+
 	const char *c = str;
 	int idx = 0;
 	if(padding)

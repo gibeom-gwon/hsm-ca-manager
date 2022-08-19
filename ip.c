@@ -3,6 +3,9 @@
 unsigned char *parse_ipv4(const char *str)
 {
 	unsigned char *buff = malloc(sizeof(unsigned char) * 4);
+	if(buff == NULL)
+		return NULL;
+
 	const char *chr = str;
 	int oct = 0;
 	int num = -1;
@@ -54,6 +57,9 @@ unsigned char *parse_ipv4(const char *str)
 unsigned char *parse_ipv6(const char *str)
 {
 	unsigned char *buff = malloc(sizeof(unsigned char) * 16);
+	if(buff == NULL)
+		return NULL;
+
 	const char *chr = str;
 	int oct = 0;
 	int num = -1;
