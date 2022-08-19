@@ -86,6 +86,7 @@ void print_help(const char *exec_name)
 
 int set_args(int argc, char *argv[])
 {
+	int ret = 0;
 	const char *pkcs11_uri_input = NULL;
 	const char *pkcs11_id_hexstring = NULL;
 
@@ -172,23 +173,48 @@ int set_args(int argc, char *argv[])
 	if(pkcs11_uri_input == NULL)
 		pkcs11_uri_input = "pkcs11:";
 
-	PKCS11_URI *pkcs11_uri = pkcs11_uri_parse(pkcs11_uri_input);
-	if(pkcs11_uri == NULL)
+	PKCS11_URI *pkcs11_uri = NULL;
+	if((ret = pkcs11_uri_parse(pkcs11_uri_input, &pkcs11_uri)) < 0)
+	{
+		switch(ret)
+		{
+			case -ENOMEM:
+				fprintf(stderr,"Out of memory\n");
+				break;
+			case -EINVAL:
+				fprintf(stderr,"Invalid PKCS11 URI input\n");
+				break;
+			case -EEXIST:
+				fprintf(stderr,"Duplicated path attribute\n");
+				break;
+		}
 		return 0;
+	}
 
 	if(arg_pkcs11_pin)
 	{
-		if(!pkcs11_uri_set_pin(pkcs11_uri,arg_pkcs11_pin))
+		if((ret = pkcs11_uri_set_pin(pkcs11_uri,arg_pkcs11_pin)) < 0)
 		{
 			pkcs11_uri_free(pkcs11_uri);
+			if(ret == -ENOMEM)
+				fprintf(stderr,"Out of memory\n");
 			return 0;
 		}
 	}
 	if(arg_pkcs11_serial)
 	{
-		if(!pkcs11_uri_set_serial(pkcs11_uri,arg_pkcs11_serial))
+		if((ret = pkcs11_uri_set_serial(pkcs11_uri,arg_pkcs11_serial)) < 0)
 		{
 			pkcs11_uri_free(pkcs11_uri);
+			switch(ret)
+			{
+				case -ENOMEM:
+					fprintf(stderr,"Out of memory\n");
+					break;
+				case -EEXIST:
+					fprintf(stderr,"Duplicated serial path attribute\n");
+					break;
+			}
 			return 0;
 		}
 	}
@@ -210,19 +236,29 @@ int set_args(int argc, char *argv[])
 			pkcs11_uri_free(pkcs11_uri);
 			return 0;
 		}
-		if(!pkcs11_uri_set_id(pkcs11_uri,pkcs11_id_uri_encoded))
+		if((ret = pkcs11_uri_set_id(pkcs11_uri,pkcs11_id_uri_encoded)) < 0)
 		{
 			free(pkcs11_id_uri_encoded);
 			pkcs11_uri_free(pkcs11_uri);
+			switch(ret)
+			{
+				case -ENOMEM:
+					fprintf(stderr,"Out of memory\n");
+					break;
+				case -EEXIST:
+					fprintf(stderr,"Duplicated id path attribute\n");
+					break;
+			}
 			return 0;
 		}
 		free(pkcs11_id_uri_encoded);
 	}
 
-	arg_pkcs11_uri = pkcs11_uri_to_str(pkcs11_uri);
-	if(arg_pkcs11_uri == NULL)
+	if((ret = pkcs11_uri_to_str(pkcs11_uri, &arg_pkcs11_uri)) < 0)
 	{
 		pkcs11_uri_free(pkcs11_uri);
+		if(ret == -ENOMEM)
+			fprintf(stderr,"Out of memory\n");
 		return 0;
 	}
 

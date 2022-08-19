@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
 #include "pkcs11_uri.h"
 
 struct pkcs11_kv
@@ -21,24 +22,24 @@ int add_kv_to_list(struct pkcs11_kv ***list , unsigned int *len, const char *key
 {
 	struct pkcs11_kv **new_list = NULL;
 	if(list == NULL)
-		return 0;
+		return -EFAULT;
 
 	struct pkcs11_kv *kv = malloc(sizeof(struct pkcs11_kv));
 	if(kv == NULL)
-		return 0;
+		return -ENOMEM;
 
 	kv->key = strdup(key);
 	if(kv->key == NULL)
 	{
 		free(kv);
-		return 0;
+		return -ENOMEM;
 	}
 	kv->value = strdup(value);
 	if(kv->value == NULL)
 	{
 		free(kv->key);
 		free(kv);
-		return 0;
+		return -ENOMEM;
 	}
 
 	if(*list == NULL)
@@ -50,12 +51,12 @@ int add_kv_to_list(struct pkcs11_kv ***list , unsigned int *len, const char *key
 		free(kv->key);
 		free(kv->value);
 		free(kv);
-		return 0;
+		return -ENOMEM;
 	}
 	*list = new_list;
 
 	(*list)[(*len)++] = kv;
-	return 1;
+	return 0;
 }
 
 int add_path(PKCS11_URI *pkcs11, const char *key, const char *value)
@@ -63,25 +64,20 @@ int add_path(PKCS11_URI *pkcs11, const char *key, const char *value)
 	for(unsigned int i = 0;i < pkcs11->path_count;i++)
 	{
 		if(strcmp(key,pkcs11->path_list[i]->key) == 0)
-			return 0;
+			return -EEXIST;
 	}
 
-	if(!add_kv_to_list(&pkcs11->path_list,&pkcs11->path_count,key,value))
-		return 0;
-
-	return 1;
+	return add_kv_to_list(&pkcs11->path_list,&pkcs11->path_count,key,value);
 }
 
 int add_query(PKCS11_URI *pkcs11, const char *key, const char *value)
 {
-	if(!add_kv_to_list(&pkcs11->query_list,&pkcs11->query_count,key,value))
-		return 0;
-
-	return 1;
+	return add_kv_to_list(&pkcs11->query_list,&pkcs11->query_count,key,value);
 }
 
 int parse_uri_path(PKCS11_URI *pkcs11, const char *path_str)
 {
+	int ret = 0;
 	size_t idx = 0;
 	int is_key = 1;
 	size_t key_start_idx = 0;
@@ -97,7 +93,7 @@ int parse_uri_path(PKCS11_URI *pkcs11, const char *path_str)
 			{
 				is_key = 0;
 				if(key_start_idx == key_end_idx)
-					return 0;
+					return -EINVAL;
 				value_start_idx = value_end_idx = idx + 1;
 			}
 			else if(path_str[idx] == ';' && key_start_idx == key_end_idx)
@@ -112,7 +108,7 @@ int parse_uri_path(PKCS11_URI *pkcs11, const char *path_str)
 				key_end_idx = idx;
 			}
 			else
-				return 0;
+				return -EINVAL;
 		}
 		else
 		{
@@ -121,13 +117,20 @@ int parse_uri_path(PKCS11_URI *pkcs11, const char *path_str)
 				is_key = 1;
 
 				char *key = strndup(path_str + key_start_idx,key_end_idx - key_start_idx + 1);
+				if(key == NULL)
+					return -ENOMEM;
 				char *value = strndup(path_str + value_start_idx,value_end_idx - value_start_idx + 1);
+				if(value == NULL)
+				{
+					free(key);
+					return -ENOMEM;
+				}
 
-				if(!add_path(pkcs11,key,value))
+				if((ret = add_path(pkcs11,key,value)) < 0)
 				{
 					free(key);
 					free(value);
-					return 0;
+					return ret;
 				}
 
 				free(key);
@@ -144,26 +147,34 @@ int parse_uri_path(PKCS11_URI *pkcs11, const char *path_str)
 	if(is_key == 0 && key_start_idx != key_end_idx)
 	{
 		char *key = strndup(path_str + key_start_idx,key_end_idx - key_start_idx + 1);
+		if(key == NULL)
+			return -ENOMEM;
 		char *value = strdup(path_str + value_start_idx);
+		if(value == NULL)
+		{
+			free(key);
+			return -ENOMEM;
+		}
 
-		if(!add_path(pkcs11,key,value))
+		if((ret = add_path(pkcs11,key,value)) < 0)
 		{
 			free(key);
 			free(value);
-			return 0;
+			return ret;
 		}
 
 		free(key);
 		free(value);
 	}
 	else if(is_key == 1 && key_start_idx != key_end_idx)
-		return 0;
+		return -EINVAL;
 
-	return 1;
+	return 0;
 }
 
 int parse_uri_query(PKCS11_URI *pkcs11, const char *query_str)
 {
+	int ret = 0;
 	size_t idx = 0;
 	int is_key = 1;
 	size_t key_start_idx = 0;
@@ -179,7 +190,7 @@ int parse_uri_query(PKCS11_URI *pkcs11, const char *query_str)
 			{
 				is_key = 0;
 				if(key_start_idx == key_end_idx)
-					return 0;
+					return -EINVAL;
 				value_start_idx = value_end_idx = idx + 1;
 			}
 			else if(query_str[idx] == '&' && key_start_idx == key_end_idx)
@@ -194,7 +205,7 @@ int parse_uri_query(PKCS11_URI *pkcs11, const char *query_str)
 				key_end_idx = idx;
 			}
 			else
-				return 0;
+				return -EINVAL;
 		}
 		else
 		{
@@ -203,13 +214,20 @@ int parse_uri_query(PKCS11_URI *pkcs11, const char *query_str)
 				is_key = 1;
 
 				char *key = strndup(query_str + key_start_idx,key_end_idx - key_start_idx + 1);
+				if(key == NULL)
+					return -ENOMEM;
 				char *value = strndup(query_str + value_start_idx,value_end_idx - value_start_idx + 1);
+				if(key == NULL)
+				{
+					free(key);
+					return -ENOMEM;
+				}
 
-				if(!add_query(pkcs11,key,value))
+				if((ret = add_query(pkcs11,key,value)) < 0)
 				{
 					free(key);
 					free(value);
-					return 0;
+					return ret;
 				}
 
 				free(key);
@@ -226,36 +244,45 @@ int parse_uri_query(PKCS11_URI *pkcs11, const char *query_str)
 	if(is_key == 0 && key_start_idx != key_end_idx)
 	{
 		char *key = strndup(query_str + key_start_idx,key_end_idx - key_start_idx + 1);
+		if(key == NULL)
+			return -ENOMEM;
 		char *value = strdup(query_str + value_start_idx);
+		if(value == NULL)
+		{
+			free(key);
+			return -ENOMEM;
+		}
 
-		if(!add_query(pkcs11,key,value))
+		if((ret = add_query(pkcs11,key,value)) < 0)
 		{
 			free(key);
 			free(value);
-			return 0;
+			return ret;
 		}
 
 		free(key);
 		free(value);
 	}
 	else if(is_key == 1 && key_start_idx != key_end_idx)
-		return 0;
+		return -EINVAL;
 
-	return 1;
+	return 0;
 }
 
-PKCS11_URI *pkcs11_uri_parse(const char *uri_string)
+int pkcs11_uri_parse(const char *uri_string, PKCS11_URI **pkcs11_out)
 {
+	int ret = 0;
 	PKCS11_URI *pkcs11 = NULL;
-	if(uri_string == NULL)
-		return NULL;
+
+	if(uri_string == NULL || pkcs11_out == NULL)
+		return -EFAULT;
 
 	if(strncmp("pkcs11:",uri_string,7) != 0)
-		return NULL;
+		return -EINVAL;
 
 	pkcs11 = malloc(sizeof(struct pkcs11_uri));
 	if(pkcs11 == NULL)
-		return NULL;
+		return -ENOMEM;
 
 	pkcs11->path_list = NULL;
 	pkcs11->path_count = 0;
@@ -265,40 +292,47 @@ PKCS11_URI *pkcs11_uri_parse(const char *uri_string)
 	char *query_start = strchr(uri_string,'?');
 	if(query_start == NULL)
 	{
-		if(!parse_uri_path(pkcs11,uri_string + 7))
+		if((ret = parse_uri_path(pkcs11,uri_string + 7)) < 0)
 		{
 			free(pkcs11);
-			return NULL;
+			return ret;
 		}
 	}
 	else
 	{
 		char *path = strndup(uri_string + 7,query_start - uri_string - 7);
-
-		if(!parse_uri_path(pkcs11,path))
+		if(path == NULL)
 		{
 			free(pkcs11);
-			return NULL;
+			return -ENOMEM;
+		}
+
+		if((ret = parse_uri_path(pkcs11,path)) < 0)
+		{
+			free(pkcs11);
+			free(path);
+			return ret;
 		}
 
 		free(path);
 
-		if(!parse_uri_query(pkcs11,query_start + 1))
+		if((ret = parse_uri_query(pkcs11,query_start + 1)) < 0)
 		{
 			free(pkcs11);
-			return NULL;
+			return ret;
 		}
 	}
 
-	return pkcs11;
+	*pkcs11_out = pkcs11;
+	return 0;
 }
 
-char *pkcs11_uri_to_str(PKCS11_URI *pkcs11)
+int pkcs11_uri_to_str(PKCS11_URI *pkcs11, char **str_out)
 {
 	char *str = strdup("pkcs11:");
-	size_t end_idx = 7;
 	if(str == NULL)
-		return NULL;
+		return -ENOMEM;
+	size_t end_idx = 7;
 
 	for(unsigned int i = 0;i < pkcs11->path_count;i++)
 	{
@@ -310,7 +344,7 @@ char *pkcs11_uri_to_str(PKCS11_URI *pkcs11)
 		if(new_str == NULL)
 		{
 			free(str);
-			return NULL;
+			return -ENOMEM;
 		}
 		str = new_str;
 
@@ -340,7 +374,7 @@ char *pkcs11_uri_to_str(PKCS11_URI *pkcs11)
 		if(new_str == NULL)
 		{
 			free(str);
-			return NULL;
+			return -ENOMEM;
 		}
 		str = new_str;
 
@@ -357,7 +391,8 @@ char *pkcs11_uri_to_str(PKCS11_URI *pkcs11)
 		str[end_idx] = 0;
 	}
 
-	return str;
+	*str_out = str;
+	return 0;
 }
 
 int pkcs11_uri_set_pin(PKCS11_URI *pkcs11, const char *pin)
