@@ -113,6 +113,7 @@ unsigned int parse_arg_extended_key_usage(const char *arg)
 
 int parse_arg_subject_alt_name(const char *arg, struct subject_alt_name **list, int *list_num)
 {
+	int ret = 0;
 	char *str = strdup(arg);
 	char *saveptr1 = NULL;
 	char *tok = strtok_r(str,",",&saveptr1);
@@ -125,6 +126,71 @@ int parse_arg_subject_alt_name(const char *arg, struct subject_alt_name **list, 
 		{
 			free(str);
 			return 0;
+		}
+
+		struct subject_alt_name san;
+		san.value = NULL;
+
+		if(strcasecmp(type,"dns") == 0)
+		{
+			san.type = SAN_TYPE_DNS;
+			san.value = strdup(value);
+			if(san.value == NULL)
+			{
+				free(str);
+				return -ENOMEM;
+			}
+		}
+		else if(strcasecmp(type,"EMAIL") == 0)
+		{
+			san.type = SAN_TYPE_EMAIL;
+			san.value = strdup(value);
+			if(san.value == NULL)
+			{
+				free(str);
+				return -ENOMEM;
+			}
+		}
+		else if(strcasecmp(type,"URI") == 0)
+		{
+			san.type = SAN_TYPE_URI;
+			san.value = strdup(value);
+			if(san.value == NULL)
+			{
+				free(str);
+				return -ENOMEM;
+			}
+		}
+		else if(strcasecmp(type,"IP") == 0)
+		{
+			if(strchr(value,'.'))
+			{
+				san.type = SAN_TYPE_IPV4;
+				if((ret = parse_ipv4(value,(unsigned char **)&san.value)) < 0)
+				{
+					free(str);
+					return ret;
+				}
+			}
+			else if(strchr(value,':'))
+			{
+				san.type = SAN_TYPE_IPV6;
+				if((ret = parse_ipv6(value,(unsigned char **)&san.value)) < 0)
+				{
+					free(str);
+					return ret;
+				}
+			}
+			else
+			{
+				free(str);
+				return -EINVAL;
+			}
+		}
+		else
+		{
+			free(str);
+			return -EBADR;
 		}
 
 		void *buff = NULL;
@@ -140,55 +206,7 @@ int parse_arg_subject_alt_name(const char *arg, struct subject_alt_name **list, 
 		}
 		*list = buff;
 		(*list_num)++;
-
-		struct subject_alt_name *san = &(*list)[*list_num - 1];
-		san->value = NULL;
-
-		if(strcasecmp(type,"dns") == 0)
-		{
-			san->type = SAN_TYPE_DNS;
-			san->value = strdup(value);
-		}
-		else if(strcasecmp(type,"EMAIL") == 0)
-		{
-			san->type = SAN_TYPE_EMAIL;
-			san->value = strdup(value);
-		}
-		else if(strcasecmp(type,"URI") == 0)
-		{
-			san->type = SAN_TYPE_URI;
-			san->value = strdup(value);
-		}
-		else if(strcasecmp(type,"IP") == 0)
-		{
-			if(strchr(value,'.'))
-			{
-				san->type = SAN_TYPE_IPV4;
-				san->value = (char*)parse_ipv4(value);
-			}
-			else if(strchr(value,':'))
-			{
-				san->type = SAN_TYPE_IPV6;
-				san->value = (char*)parse_ipv6(value);
-			}
-			else
-			{
-				fprintf(stderr,"invalid IP address syntax\n");
-				return 0;
-			}
-
-			if(san->value == NULL)
-			{
-				fprintf(stderr,"invalid IP address syntax\n");
-				return 0;
-			}
-		}
-		else
-		{
-			fprintf(stderr,"unknown subject alt name type '%s'. Supported types: DNS, EMAIL, URI\n",type);
-			free(str);
-			return 0;
-		}
+		(*list)[*list_num - 1] = san;
 
 		tok = strtok_r(NULL,",",&saveptr1);
 	}

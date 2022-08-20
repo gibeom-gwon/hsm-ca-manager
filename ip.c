@@ -1,10 +1,11 @@
 #include <stdlib.h>
+#include <errno.h>
 
-unsigned char *parse_ipv4(const char *str)
+int parse_ipv4(const char *str, unsigned char **out)
 {
 	unsigned char *buff = malloc(sizeof(unsigned char) * 4);
 	if(buff == NULL)
-		return NULL;
+		return -ENOMEM;
 
 	const char *chr = str;
 	int oct = 0;
@@ -16,7 +17,7 @@ unsigned char *parse_ipv4(const char *str)
 			if(oct >= 3 || num == -1)
 			{
 				free(buff);
-				return NULL;
+				return -EINVAL;
 			}
 			buff[oct++] = num;
 			num = -1;
@@ -26,7 +27,7 @@ unsigned char *parse_ipv4(const char *str)
 			if(*chr < '0' || *chr > '9')
 			{
 				free(buff);
-				return NULL;
+				return -EINVAL;
 			}
 			if(num == -1)
 				num = *chr - '0';
@@ -39,7 +40,7 @@ unsigned char *parse_ipv4(const char *str)
 			if(num > 255)
 			{
 				free(buff);
-				return NULL;
+				return -EINVAL;
 			}
 		}
 		chr++;
@@ -48,17 +49,19 @@ unsigned char *parse_ipv4(const char *str)
 	if(num == -1)
 	{
 		free(buff);
-		return NULL;
+		return -EINVAL;
 	}
 	buff[oct] = num;
-	return buff;
+
+	*out = buff;
+	return 0;
 }
 
-unsigned char *parse_ipv6(const char *str)
+int parse_ipv6(const char *str, unsigned char **out)
 {
 	unsigned char *buff = malloc(sizeof(unsigned char) * 16);
 	if(buff == NULL)
-		return NULL;
+		return -ENOMEM;
 
 	const char *chr = str;
 	int oct = 0;
@@ -75,7 +78,7 @@ unsigned char *parse_ipv6(const char *str)
 				if(ellipsis_oct != -1)
 				{
 					free(buff);
-					return NULL;
+					return -EINVAL;
 				}
 				ellipsis_oct = oct;
 				chr++;
@@ -85,7 +88,7 @@ unsigned char *parse_ipv6(const char *str)
 			if(oct >= 14)
 			{
 				free(buff);
-				return NULL;
+				return -EINVAL;
 			}
 			buff[oct++] = num >> 8;
 			buff[oct++] = num & 0xFF;
@@ -103,7 +106,7 @@ unsigned char *parse_ipv6(const char *str)
 			else
 			{
 				free(buff);
-				return NULL;
+				return -EINVAL;
 			}
 
 			if(num == -1)
@@ -117,7 +120,7 @@ unsigned char *parse_ipv6(const char *str)
 			if(num > 0xFFFF)
 			{
 				free(buff);
-				return NULL;
+				return -EINVAL;
 			}
 		}
 		chr++;
@@ -146,5 +149,7 @@ unsigned char *parse_ipv6(const char *str)
 				buff[i] = 0;
 		}
 	}
-	return buff;
+
+	*out = buff;
+	return 0;
 }

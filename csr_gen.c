@@ -147,8 +147,22 @@ int set_args(int argc, char *argv[])
 				arg_extended_key_usage_flag |= extended_key_usage_flag;
 				break;
 			case 's':
-				if(!parse_arg_subject_alt_name(optarg,&arg_subject_alt_name,&arg_subject_alt_name_num))
+				if((ret = parse_arg_subject_alt_name(optarg,&arg_subject_alt_name,&arg_subject_alt_name_num)) < 0)
+				{
+					switch(ret)
+					{
+						case -ENOMEM:
+							fprintf(stderr,"Out of memory\n");
+						break;
+						case -EINVAL:
+							fprintf(stderr,"Invalid IP address\n");
+						break;
+						case -EBADR:
+							fprintf(stderr,"Unknown subject alt name type\n");
+						break;
+					}
 					return 0;
+				}
 				break;
 			case 'o':
 				arg_output = optarg;
