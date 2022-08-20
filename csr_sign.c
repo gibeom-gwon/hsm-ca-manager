@@ -364,8 +364,11 @@ int main(int argc, char *argv[])
 
 	if(arg_output != NULL)
 	{
-		if(!export_x509_to_pem_file(arg_output,result_cert))
+		if(export_x509_to_pem_file(arg_output,result_cert) < 0)
+		{
+			fprintf(stderr,"Export certificate to file failed\n");
 			goto openssl_fail;
+		}
 	}
 	else
 	{
