@@ -21,6 +21,9 @@ int arg_subject_alt_name_num = 0;
 int parse_arg_name_entries(char *arg)
 {
 	char *str = strdup(arg);
+	if(str == NULL)
+		return -1;
+
 	char *saveptr1 = NULL;
 	char *tok = strtok_r(str,",",&saveptr1);
 	while(tok != NULL)
