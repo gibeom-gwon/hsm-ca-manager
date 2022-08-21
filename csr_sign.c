@@ -145,8 +145,9 @@ int set_args(int argc, char *argv[])
 			case 'r':
 				if(parse_arg_basic_constraints("True",&arg_basic_constraints) < 0)
 					return -1;
-				if(!parse_arg_key_usage("keyCertSign,cRLSign"))
+				if(!(key_usage_flag = parse_arg_key_usage("keyCertSign,cRLSign")))
 					return -1;
+				arg_key_usage_flag |= key_usage_flag;
 				break;
 			case 'i':
 				arg_csr = optarg;
