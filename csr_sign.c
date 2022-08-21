@@ -372,8 +372,11 @@ int main(int argc, char *argv[])
 	}
 	else
 	{
-		if(!print_x509_pem(result_cert))
+		if(print_x509_pem(result_cert) < 0)
+		{
+			fprintf(stderr,"Certificate PEM print failed\n");
 			goto openssl_fail;
+		}
 	}
 
 	cleanup:

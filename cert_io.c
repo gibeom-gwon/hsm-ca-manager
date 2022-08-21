@@ -61,7 +61,9 @@ int export_x509_to_pem_file(const char *filepath, X509 *cert)
 
 int print_x509_pem(X509 *cert)
 {
-	return PEM_write_X509(stdout,cert);
+	if(PEM_write_X509(stdout,cert))
+		return 0;
+	return -1;
 }
 
 int export_csr_to_pem_file(const char *filepath, X509_REQ *csr)
@@ -80,5 +82,7 @@ int export_csr_to_pem_file(const char *filepath, X509_REQ *csr)
 
 int print_csr_pem(X509_REQ *csr)
 {
-	return PEM_write_X509_REQ(stdout,csr);
+	if(PEM_write_X509_REQ(stdout,csr))
+		return 0;
+	return -1;
 }

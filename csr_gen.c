@@ -341,8 +341,11 @@ int main(int argc, char *argv[])
 	}
 	else
 	{
-		if(!print_csr_pem(csr))
+		if(print_csr_pem(csr) < 0)
+		{
+			fprintf(stderr,"CSR PEM print failed\n");
 			goto openssl_fail;
+		}
 	}
 
 	cleanup:
