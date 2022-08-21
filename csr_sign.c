@@ -100,7 +100,7 @@ int set_args(int argc, char *argv[])
 			case 'e':
 				arg_expires = atoi(optarg);
 				if(arg_expires < 1)
-					return 0;
+					return -1;
 				break;
 			case 'c':
 				arg_ca_cert = optarg;
@@ -109,19 +109,19 @@ int set_args(int argc, char *argv[])
 				arg_ignore_requested_extensions = 1;
 				break;
 			case 'b':
-				if(!parse_arg_basic_constraints(optarg,&arg_basic_constraints))
-					return 0;
+				if(parse_arg_basic_constraints(optarg,&arg_basic_constraints) < 0)
+					return -1;
 				break;
 			case 'k':
 				int key_usage_flag = 0;
 				if(!(key_usage_flag = parse_arg_key_usage(optarg)))
-					return 0;
+					return -1;
 				arg_key_usage_flag |= key_usage_flag;
 				break;
 			case 'K':
 				int extended_key_usage_flag = 0;
 				if(!(extended_key_usage_flag = parse_arg_extended_key_usage(optarg)))
-					return 0;
+					return -1;
 				arg_extended_key_usage_flag |= extended_key_usage_flag;
 				break;
 			case 's':
@@ -139,14 +139,14 @@ int set_args(int argc, char *argv[])
 							fprintf(stderr,"Unknown subject alt name type\n");
 						break;
 					}
-					return 0;
+					return -1;
 				}
 				break;
 			case 'r':
-				if(!parse_arg_basic_constraints("True",&arg_basic_constraints))
-					return 0;
+				if(parse_arg_basic_constraints("True",&arg_basic_constraints) < 0)
+					return -1;
 				if(!parse_arg_key_usage("keyCertSign,cRLSign"))
-					return 0;
+					return -1;
 				break;
 			case 'i':
 				arg_csr = optarg;
@@ -158,7 +158,7 @@ int set_args(int argc, char *argv[])
 				print_help(argv[0]);
 			case '?':
 			default:
-				return 0;
+				return -1;
 		}
 	}
 
@@ -189,7 +189,7 @@ int set_args(int argc, char *argv[])
 				fprintf(stderr,"Duplicated path attribute\n");
 				break;
 		}
-		return 0;
+		return -1;
 	}
 
 	if(arg_pkcs11_pin)
@@ -199,7 +199,7 @@ int set_args(int argc, char *argv[])
 			pkcs11_uri_free(pkcs11_uri);
 			if(ret == -ENOMEM)
 				fprintf(stderr,"Out of memory\n");
-			return 0;
+			return -1;
 		}
 	}
 
@@ -217,7 +217,7 @@ int set_args(int argc, char *argv[])
 					fprintf(stderr,"Duplicated serial path attribute\n");
 					break;
 			}
-			return 0;
+			return -1;
 		}
 	}
 
@@ -230,13 +230,13 @@ int set_args(int argc, char *argv[])
 		{
 			fprintf(stderr,"Invalid PKCS11 id hexstring\n");
 			pkcs11_uri_free(pkcs11_uri);
-			return 0;
+			return -1;
 		}
 		char *pkcs11_id_uri_encoded = hexstring_to_uri_encoded(pkcs11_id_hexstring);
 		if(pkcs11_id_uri_encoded == NULL)
 		{
 			pkcs11_uri_free(pkcs11_uri);
-			return 0;
+			return -1;
 		}
 		if((ret = pkcs11_uri_set_id(pkcs11_uri,pkcs11_id_uri_encoded)) < 0)
 		{
@@ -251,7 +251,7 @@ int set_args(int argc, char *argv[])
 					fprintf(stderr,"Duplicated id path attribute\n");
 					break;
 			}
-			return 0;
+			return -1;
 		}
 		free(pkcs11_id_uri_encoded);
 	}
@@ -261,7 +261,7 @@ int set_args(int argc, char *argv[])
 		pkcs11_uri_free(pkcs11_uri);
 		if(ret == -ENOMEM)
 			fprintf(stderr,"Out of memory\n");
-		return 0;
+		return -1;
 	}
 
 	pkcs11_uri_free(pkcs11_uri);
@@ -272,10 +272,10 @@ int set_args(int argc, char *argv[])
 	if(arg_csr == NULL)
 	{
 		fprintf(stderr,"--csr option required\n");
-		return 0;
+		return -1;
 	}
 
-	return 1;
+	return 0;
 }
 
 int main(int argc, char *argv[])
@@ -287,7 +287,7 @@ int main(int argc, char *argv[])
 	ENGINE *hsm = NULL;
 	EVP_PKEY *privkey = NULL;
 
-	if(!set_args(argc,argv))
+	if(set_args(argc,argv) < 0)
 		goto fail;
 
 	if((hsm = hsm_init()) == NULL)
@@ -299,67 +299,67 @@ int main(int argc, char *argv[])
 	if((cert_req = load_csr(arg_csr)) == NULL)
 		goto openssl_fail;
 
-	if(!verify_csr(cert_req))
+	if(verify_csr(cert_req) < 0)
 		goto openssl_fail;
 
 	if(arg_ca_cert != NULL && (ca_cert = load_x509(arg_ca_cert)) == NULL)
 		goto openssl_fail;
 
-	if(!set_version3(result_cert))
+	if(set_version3(result_cert) < 0)
 		goto openssl_fail;
 
-	if(!set_random_serialNumber(result_cert))
+	if(set_random_serialNumber(result_cert) < 0)
 		goto openssl_fail;
 
-	if(!set_subject_name_from_csr(result_cert,cert_req))
+	if(set_subject_name_from_csr(result_cert,cert_req) < 0)
 		goto openssl_fail;
 
 	if(ca_cert != NULL)
 	{
-		if(!set_issuer_name_from_x509(result_cert,ca_cert))
+		if(set_issuer_name_from_x509(result_cert,ca_cert) < 0)
 			goto openssl_fail;
 	}
 	else
 	{
-		if(!set_issuer_name_from_x509(result_cert,result_cert))
+		if(set_issuer_name_from_x509(result_cert,result_cert) < 0)
 			goto openssl_fail;
 	}
 
-	if(!set_expire_date(result_cert,arg_expires))
+	if(set_expire_date(result_cert,arg_expires) < 0)
 		goto openssl_fail;
 
-	if(!copy_pubkey_from_csr(result_cert,cert_req))
+	if(copy_pubkey_from_csr(result_cert,cert_req) < 0)
 		goto openssl_fail;
 
-	if(!arg_ignore_requested_extensions && !copy_extensions_from_csr(result_cert,cert_req))
+	if(!arg_ignore_requested_extensions && copy_extensions_from_csr(result_cert,cert_req) < 0)
 		goto openssl_fail;
 
 	if(arg_basic_constraints.ca != -1)
 	{
-		if(!set_extension_basic_constraints(result_cert,arg_basic_constraints))
+		if(set_extension_basic_constraints(result_cert,arg_basic_constraints) < 0)
 			goto openssl_fail;
 	}
 
-	if(arg_key_usage_flag && !set_extension_key_usage(result_cert,arg_key_usage_flag))
+	if(arg_key_usage_flag && set_extension_key_usage(result_cert,arg_key_usage_flag) < 0)
 		goto openssl_fail;
 
-	if(arg_extended_key_usage_flag && !set_extension_extended_key_usage(result_cert,arg_extended_key_usage_flag))
+	if(arg_extended_key_usage_flag && set_extension_extended_key_usage(result_cert,arg_extended_key_usage_flag) < 0)
 		goto openssl_fail;
 
-	if(arg_subject_alt_name && !set_extension_subject_alt_name(result_cert,arg_subject_alt_name,arg_subject_alt_name_num))
+	if(arg_subject_alt_name && set_extension_subject_alt_name(result_cert,arg_subject_alt_name,arg_subject_alt_name_num) < 0)
 		goto openssl_fail;
 
-	if(!set_skid(result_cert))
+	if(set_skid(result_cert) < 0)
 		goto openssl_fail;
 
-	if(ca_cert != NULL && !set_akid_from_x509_skid(result_cert,ca_cert))
+	if(ca_cert != NULL && set_akid_from_x509_skid(result_cert,ca_cert) < 0)
 		goto openssl_fail;
 
 	privkey = get_privkey_from_hsm(hsm,arg_pkcs11_uri);
 	if(privkey == NULL)
 		goto openssl_fail;
 
-	if(!sign_x509(result_cert,privkey))
+	if(sign_x509(result_cert,privkey) < 0)
 		goto openssl_fail;
 
 	if(arg_output != NULL)

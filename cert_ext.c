@@ -55,16 +55,16 @@ int parse_arg_basic_constraints(const char *arg, struct basic_constraints *opt)
 			if(opt->pathlen < 0 || errno != 0 || *endptr != 0)
 			{
 				fprintf(stderr,"Invalid syntax of --basic-constraints argument\n");
-				return 0;
+				return -1;
 			}
 		}
 	}
 	else
 	{
 		fprintf(stderr,"Invalid syntax of --basic-constraints argument\n");
-		return 0;
+		return -1;
 	}
-	return 1;
+	return 0;
 }
 
 unsigned int parse_arg_key_usage(const char *arg)
@@ -125,7 +125,7 @@ int parse_arg_subject_alt_name(const char *arg, struct subject_alt_name **list, 
 		if(value == NULL)
 		{
 			free(str);
-			return 0;
+			return -EINVAL;
 		}
 
 		struct subject_alt_name san;
@@ -202,7 +202,7 @@ int parse_arg_subject_alt_name(const char *arg, struct subject_alt_name **list, 
 		if(buff == NULL)
 		{
 			free(str);
-			return 0;
+			return -EINVAL;
 		}
 		*list = buff;
 		(*list_num)++;
@@ -212,7 +212,7 @@ int parse_arg_subject_alt_name(const char *arg, struct subject_alt_name **list, 
 	}
 
 	free(str);
-	return 1;
+	return 0;
 }
 
 X509_EXTENSIONS *get_csr_extensions(X509_REQ *csr)
@@ -237,7 +237,7 @@ int copy_extensions_from_csr(X509 *cert, X509_REQ *csr)
 {
 	X509_EXTENSIONS *req_extensions = get_csr_extensions(csr);
 	if(req_extensions == NULL)
-		return 0;
+		return -1;
 	int extension_num = sk_X509_EXTENSION_num(req_extensions);
 	int *extension_nid_list = malloc(sizeof(int) * extension_num);
 
@@ -254,15 +254,15 @@ int copy_extensions_from_csr(X509 *cert, X509_REQ *csr)
 		for(int j = i + 1;j < extension_num;j++)
 		{
 			if(extension_nid_list[i] == extension_nid_list[j])
-				return 0;
+				return -1;
 		}
 		if(!X509_add_ext(cert,ext,-1))
-			return 0;
+			return -1;
 	}
 
 	free(extension_nid_list);
 	sk_X509_EXTENSION_pop_free(req_extensions,X509_EXTENSION_free);
-	return 1;
+	return 0;
 }
 
 int remove_csr_extensions(X509_REQ *csr)
@@ -272,10 +272,10 @@ int remove_csr_extensions(X509_REQ *csr)
 	{
 		X509_ATTRIBUTE *attr = X509_REQ_delete_attr(csr,ext_req_attr_loc);
 		if(attr == NULL)
-			return 0;
+			return -1;
 		X509_ATTRIBUTE_free(attr);
 	}
-	return 1;
+	return 0;
 }
 
 X509_EXTENSIONS *take_csr_extensions(X509_REQ *csr)
@@ -284,7 +284,7 @@ X509_EXTENSIONS *take_csr_extensions(X509_REQ *csr)
 	if(exts == NULL)
 		return NULL;
 
-	if(!remove_csr_extensions(csr))
+	if(remove_csr_extensions(csr) < 0)
 	{
 		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 		return NULL;
@@ -308,12 +308,12 @@ BASIC_CONSTRAINTS *create_basic_constraints_internal(struct basic_constraints ba
 		if(plen == NULL)
 		{
 			BASIC_CONSTRAINTS_free(bcons);
-			return 0;
+			return NULL;
 		}
 		if(!ASN1_INTEGER_set(plen,basic_constraints.pathlen))
 		{
 			BASIC_CONSTRAINTS_free(bcons);
-			return 0;
+			return NULL;
 		}
 		bcons->pathlen = plen;
 	}
@@ -324,47 +324,47 @@ int set_extension_basic_constraints(X509 *cert, struct basic_constraints basic_c
 {
 	BASIC_CONSTRAINTS *bcons = create_basic_constraints_internal(basic_constraints);
 	if(bcons == NULL)
-		return 0;
+		return -1;
 
 	if(!X509_add1_ext_i2d(cert,NID_basic_constraints,bcons,1,X509V3_ADD_REPLACE))
 	{
 		BASIC_CONSTRAINTS_free(bcons);
-		return 0;
+		return -1;
 	}
 	BASIC_CONSTRAINTS_free(bcons);
-	return 1;
+	return 0;
 }
 
 int request_extension_basic_constraints(X509_REQ *csr, struct basic_constraints basic_constraints)
 {
 	BASIC_CONSTRAINTS *bcons = create_basic_constraints_internal(basic_constraints);
 	if(bcons == NULL)
-		return 0;
+		return -1;
 
 	X509_EXTENSIONS *exts = take_csr_extensions(csr);
 	if(exts == NULL)
 	{
 		BASIC_CONSTRAINTS_free(bcons);
-		return 0;
+		return -1;
 	}
 
 	if(X509V3_add1_i2d(&exts,NID_basic_constraints,bcons,1,X509V3_ADD_REPLACE) < 1)
 	{
 		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 		BASIC_CONSTRAINTS_free(bcons);
-		return 0;
+		return -1;
 	}
 
 	if(!X509_REQ_add_extensions(csr,exts))
 	{
 		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 		BASIC_CONSTRAINTS_free(bcons);
-		return 0;
+		return -1;
 	}
 
 	sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 	BASIC_CONSTRAINTS_free(bcons);
-	return 1;
+	return 0;
 }
 
 ASN1_BIT_STRING *create_key_usage_internal(unsigned int key_usage)
@@ -398,47 +398,47 @@ int set_extension_key_usage(X509 *cert, unsigned int key_usage)
 {
 	ASN1_BIT_STRING *bs = create_key_usage_internal(key_usage);
 	if(bs == NULL)
-		return 0;
+		return -1;
 
 	if(X509_add1_ext_i2d(cert,NID_key_usage,bs,1,X509V3_ADD_REPLACE) < 1)
 	{
 		ASN1_BIT_STRING_free(bs);
-		return 0;
+		return -1;
 	}
 	ASN1_BIT_STRING_free(bs);
-	return 1;
+	return 0;
 }
 
 int request_extension_key_usage(X509_REQ *csr, unsigned int key_usage)
 {
 	ASN1_BIT_STRING *bs = create_key_usage_internal(key_usage);
 	if(bs == NULL)
-		return 0;
+		return -1;
 
 	X509_EXTENSIONS *exts = take_csr_extensions(csr);
 	if(exts == NULL)
 	{
 		ASN1_BIT_STRING_free(bs);
-		return 0;
+		return -1;
 	}
 
 	if(X509V3_add1_i2d(&exts,NID_key_usage,bs,1,X509V3_ADD_REPLACE) < 1)
 	{
 		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 		ASN1_BIT_STRING_free(bs);
-		return 0;
+		return -1;
 	}
 
 	if(!X509_REQ_add_extensions(csr,exts))
 	{
 		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 		ASN1_BIT_STRING_free(bs);
-		return 0;
+		return -1;
 	}
 
 	sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 	ASN1_BIT_STRING_free(bs);
-	return 1;
+	return 0;
 }
 
 unsigned int get_extension_key_usage_bit_by_name(const char *name)
@@ -477,47 +477,47 @@ int set_extension_extended_key_usage(X509 *cert, unsigned int extended_key_usage
 {
 	EXTENDED_KEY_USAGE *extku = create_extended_key_usage_internal(extended_key_usage);
 	if(extku == NULL)
-		return 0;
+		return -1;
 
 	if(X509_add1_ext_i2d(cert,NID_ext_key_usage,extku,0,X509V3_ADD_REPLACE) < 1)
 	{
 		EXTENDED_KEY_USAGE_free(extku);
-		return 0;
+		return -1;
 	}
 
 	EXTENDED_KEY_USAGE_free(extku);
-	return 1;
+	return 0;
 }
 
 int request_extension_extended_key_usage(X509_REQ *csr, unsigned int extended_key_usage)
 {
 	EXTENDED_KEY_USAGE *extku = create_extended_key_usage_internal(extended_key_usage);
 	if(extku == NULL)
-		return 0;
+		return -1;
 
 	X509_EXTENSIONS *exts = take_csr_extensions(csr);
 	if(exts == NULL)
 	{
 		EXTENDED_KEY_USAGE_free(extku);
-		return 0;
+		return -1;
 	}
 
 	if(X509V3_add1_i2d(&exts,NID_ext_key_usage,extku,0,X509V3_ADD_REPLACE) < 1)
 	{
 		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 		EXTENDED_KEY_USAGE_free(extku);
-		return 0;
+		return -1;
 	}
 
 	if(!X509_REQ_add_extensions(csr,exts))
 	{
 		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 		EXTENDED_KEY_USAGE_free(extku);
-		return 0;
+		return -1;
 	}
 
 	EXTENDED_KEY_USAGE_free(extku);
-	return 1;
+	return 0;
 }
 
 unsigned get_extension_extended_key_usage_bit_by_name(const char *name)
@@ -534,7 +534,7 @@ GENERAL_NAMES *create_subject_alt_name_internal(struct subject_alt_name *list, i
 {
 	GENERAL_NAMES *gens = sk_GENERAL_NAME_new_null();
 	if(gens == NULL)
-		return 0;
+		return NULL;
 
 	for(int i = 0;i < num;i++)
 	{
@@ -626,47 +626,47 @@ int set_extension_subject_alt_name(X509 *cert, struct subject_alt_name *list,int
 {
 	GENERAL_NAMES *gens = create_subject_alt_name_internal(list,num);
 	if(gens == NULL)
-		return 0;
+		return -1;
 
 	if(!X509_add1_ext_i2d(cert,NID_subject_alt_name,gens,0,X509V3_ADD_REPLACE))
 	{
 		sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
-		return 0;
+		return -1;
 	}
 
 	sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
-	return 1;
+	return 0;
 }
 
 int request_extension_subject_alt_name(X509_REQ *csr, struct subject_alt_name *list,int num)
 {
 	GENERAL_NAMES *gens = create_subject_alt_name_internal(list,num);
 	if(gens == NULL)
-		return 0;
+		return -1;
 
 	X509_EXTENSIONS *exts = take_csr_extensions(csr);
 	if(exts == NULL)
 	{
 		sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
-		return 0;
+		return -1;
 	}
 
 	if(X509V3_add1_i2d(&exts,NID_subject_alt_name,gens,0,X509V3_ADD_REPLACE) < 1)
 	{
 		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 		sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
-		return 0;
+		return -1;
 	}
 
 	if(!X509_REQ_add_extensions(csr,exts))
 	{
 		sk_X509_EXTENSION_pop_free(exts,X509_EXTENSION_free);
 		sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
-		return 0;
+		return -1;
 	}
 
 	sk_GENERAL_NAME_pop_free(gens,GENERAL_NAME_free);
-	return 1;
+	return 0;
 }
 
 int set_skid(X509 *cert)
@@ -675,49 +675,49 @@ int set_skid(X509 *cert)
 	unsigned int len;
 	ASN1_STRING *oct_string = ASN1_STRING_new();
 	if(!oct_string)
-		return 0;
+		return -1;
 	if(!X509_pubkey_digest(cert,EVP_sha1(),pubkey_hash,&len))
 	{
 		ASN1_STRING_free(oct_string);
-		return 0;
+		return -1;
 	}
 	if(!ASN1_STRING_set(oct_string,pubkey_hash,SHA_DIGEST_LENGTH))
 	{
 		ASN1_STRING_free(oct_string);
-		return 0;
+		return -1;
 	}
 	if(X509_add1_ext_i2d(cert,NID_subject_key_identifier,oct_string,0,X509V3_ADD_REPLACE) < 1)
 	{
 		ASN1_STRING_free(oct_string);
-		return 0;
+		return -1;
 	}
 	ASN1_STRING_free(oct_string);
-	return 1;
+	return 0;
 }
 
 int set_akid_from_x509_skid(X509 *to, X509 *from)
 {
 	int ext_loc = X509_get_ext_by_NID(from,NID_subject_key_identifier,-1);
 	if(ext_loc == -1)
-		return 0;
+		return -1;
 	X509_EXTENSION *root_ca_subject_key_id = X509_get_ext(from,ext_loc);
 	if(root_ca_subject_key_id == NULL)
-		return 0;
+		return -1;
 	ASN1_STRING *ext_data = X509_EXTENSION_get_data(root_ca_subject_key_id);
 	const unsigned char *data = ASN1_STRING_get0_data(ext_data);
 	ASN1_STRING *issuer_subject_key_id = NULL;
 	if(d2i_ASN1_OCTET_STRING(&issuer_subject_key_id,&data,ASN1_STRING_length(ext_data)) == NULL)
-		return 0;
+		return -1;
 
 	AUTHORITY_KEYID *akid = AUTHORITY_KEYID_new();
 	if(!akid)
-		return 0;
+		return -1;
 	akid->keyid = issuer_subject_key_id;
 	if(X509_add1_ext_i2d(to,NID_authority_key_identifier,akid,0,X509V3_ADD_REPLACE) < 1)
 	{
 		AUTHORITY_KEYID_free(akid);
-		return 0;
+		return -1;
 	}
 	AUTHORITY_KEYID_free(akid);
-	return 1;
+	return 0;
 }
