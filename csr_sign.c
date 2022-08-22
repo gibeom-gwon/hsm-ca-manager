@@ -109,8 +109,8 @@ int set_args(int argc, char *argv[])
 				arg_ignore_requested_extensions = 1;
 				break;
 			case 'b':
-				if(parse_arg_basic_constraints(optarg,&arg_basic_constraints) < 0)
-					return -1;
+				if((ret = parse_arg_basic_constraints(optarg,&arg_basic_constraints)) < 0)
+					return ret;
 				break;
 			case 'k':
 				int key_usage_flag = 0;
@@ -139,12 +139,12 @@ int set_args(int argc, char *argv[])
 							fprintf(stderr,"Unknown subject alt name type\n");
 						break;
 					}
-					return -1;
+					return ret;
 				}
 				break;
 			case 'r':
-				if(parse_arg_basic_constraints("True",&arg_basic_constraints) < 0)
-					return -1;
+				if((ret = parse_arg_basic_constraints("True",&arg_basic_constraints)) < 0)
+					return ret;
 				if(!(key_usage_flag = parse_arg_key_usage("keyCertSign,cRLSign")))
 					return -1;
 				arg_key_usage_flag |= key_usage_flag;
@@ -190,7 +190,7 @@ int set_args(int argc, char *argv[])
 				fprintf(stderr,"Duplicated path attribute\n");
 				break;
 		}
-		return -1;
+		return ret;
 	}
 
 	if(arg_pkcs11_pin)
@@ -200,7 +200,7 @@ int set_args(int argc, char *argv[])
 			pkcs11_uri_free(pkcs11_uri);
 			if(ret == -ENOMEM)
 				fprintf(stderr,"Out of memory\n");
-			return -1;
+			return ret;
 		}
 	}
 
@@ -218,7 +218,7 @@ int set_args(int argc, char *argv[])
 					fprintf(stderr,"Duplicated serial path attribute\n");
 					break;
 			}
-			return -1;
+			return ret;
 		}
 	}
 
@@ -252,7 +252,7 @@ int set_args(int argc, char *argv[])
 					fprintf(stderr,"Duplicated id path attribute\n");
 					break;
 			}
-			return -1;
+			return ret;
 		}
 		free(pkcs11_id_uri_encoded);
 	}
@@ -262,7 +262,7 @@ int set_args(int argc, char *argv[])
 		pkcs11_uri_free(pkcs11_uri);
 		if(ret == -ENOMEM)
 			fprintf(stderr,"Out of memory\n");
-		return -1;
+		return ret;
 	}
 
 	pkcs11_uri_free(pkcs11_uri);
@@ -288,84 +288,99 @@ int main(int argc, char *argv[])
 	ENGINE *hsm = NULL;
 	EVP_PKEY *privkey = NULL;
 
-	if(set_args(argc,argv) < 0)
-		goto fail;
+	if((ret = set_args(argc,argv)) < 0)
+		goto cleanup;
 
 	if((hsm = hsm_init()) == NULL)
+	{
+		ret = -1;
 		goto openssl_fail;
+	}
 
 	if((result_cert = x509_new()) == NULL)
+	{
+		ret = -1;
 		goto openssl_fail;
+	}
 
 	if((cert_req = load_csr(arg_csr)) == NULL)
+	{
+		ret = -1;
 		goto openssl_fail;
+	}
 
-	if(verify_csr(cert_req) < 0)
+	if((ret = verify_csr(cert_req)) < 0)
 		goto openssl_fail;
 
 	if(arg_ca_cert != NULL && (ca_cert = load_x509(arg_ca_cert)) == NULL)
+	{
+		ret = -1;
+		goto openssl_fail;
+	}
+
+	if((ret = set_version3(result_cert)) < 0)
 		goto openssl_fail;
 
-	if(set_version3(result_cert) < 0)
+	if((ret = set_random_serialNumber(result_cert)) < 0)
 		goto openssl_fail;
 
-	if(set_random_serialNumber(result_cert) < 0)
-		goto openssl_fail;
-
-	if(set_subject_name_from_csr(result_cert,cert_req) < 0)
+	if((ret = set_subject_name_from_csr(result_cert,cert_req)) < 0)
 		goto openssl_fail;
 
 	if(ca_cert != NULL)
 	{
-		if(set_issuer_name_from_x509(result_cert,ca_cert) < 0)
+		if((ret = set_issuer_name_from_x509(result_cert,ca_cert)) < 0)
 			goto openssl_fail;
 	}
 	else
 	{
-		if(set_issuer_name_from_x509(result_cert,result_cert) < 0)
+		if((ret = set_issuer_name_from_x509(result_cert,result_cert)) < 0)
 			goto openssl_fail;
 	}
 
-	if(set_expire_date(result_cert,arg_expires) < 0)
+	if((ret = set_expire_date(result_cert,arg_expires)) < 0)
 		goto openssl_fail;
 
-	if(copy_pubkey_from_csr(result_cert,cert_req) < 0)
+	if((ret = copy_pubkey_from_csr(result_cert,cert_req)) < 0)
 		goto openssl_fail;
 
-	if(!arg_ignore_requested_extensions && copy_extensions_from_csr(result_cert,cert_req) < 0)
+	if(!arg_ignore_requested_extensions && (ret = copy_extensions_from_csr(result_cert,cert_req)) < 0)
 		goto openssl_fail;
 
 	if(arg_basic_constraints.ca != -1)
 	{
-		if(set_extension_basic_constraints(result_cert,arg_basic_constraints) < 0)
+		if((ret = set_extension_basic_constraints(result_cert,arg_basic_constraints)) < 0)
 			goto openssl_fail;
 	}
 
-	if(arg_key_usage_flag && set_extension_key_usage(result_cert,arg_key_usage_flag) < 0)
+	if(arg_key_usage_flag && (ret = set_extension_key_usage(result_cert,arg_key_usage_flag)) < 0)
 		goto openssl_fail;
 
-	if(arg_extended_key_usage_flag && set_extension_extended_key_usage(result_cert,arg_extended_key_usage_flag) < 0)
+	if(arg_extended_key_usage_flag && (ret = set_extension_extended_key_usage(result_cert,arg_extended_key_usage_flag)) < 0)
 		goto openssl_fail;
 
-	if(arg_subject_alt_name && set_extension_subject_alt_name(result_cert,arg_subject_alt_name,arg_subject_alt_name_num) < 0)
+	if(arg_subject_alt_name && (ret = set_extension_subject_alt_name(result_cert,arg_subject_alt_name,arg_subject_alt_name_num)) < 0)
 		goto openssl_fail;
 
-	if(set_skid(result_cert) < 0)
+	if((ret = set_skid(result_cert)) < 0)
 		goto openssl_fail;
 
-	if(ca_cert != NULL && set_akid_from_x509_skid(result_cert,ca_cert) < 0)
+	if(ca_cert != NULL && (ret = set_akid_from_x509_skid(result_cert,ca_cert)) < 0)
 		goto openssl_fail;
 
 	privkey = get_privkey_from_hsm(hsm,arg_pkcs11_uri);
 	if(privkey == NULL)
+	{
+		ret = -1;
 		goto openssl_fail;
+	}
 
-	if(sign_x509(result_cert,privkey) < 0)
+	if((ret = sign_x509(result_cert,privkey)) < 0)
 		goto openssl_fail;
 
 	if(arg_output != NULL)
 	{
-		if(export_x509_to_pem_file(arg_output,result_cert) < 0)
+		if((ret = export_x509_to_pem_file(arg_output,result_cert)) < 0)
 		{
 			fprintf(stderr,"Export certificate to file failed\n");
 			goto openssl_fail;
@@ -373,7 +388,7 @@ int main(int argc, char *argv[])
 	}
 	else
 	{
-		if(print_x509_pem(result_cert) < 0)
+		if((ret = print_x509_pem(result_cert)) < 0)
 		{
 			fprintf(stderr,"Certificate PEM print failed\n");
 			goto openssl_fail;
@@ -404,7 +419,5 @@ int main(int argc, char *argv[])
 
 	openssl_fail:
 	fprintf(stderr,"openssl error: %s\n",ssl_get_error_string());
-	fail:
-	ret = -1;
 	goto cleanup;
 }

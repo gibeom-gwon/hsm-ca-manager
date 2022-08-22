@@ -20,9 +20,10 @@ int arg_subject_alt_name_num = 0;
 
 int parse_arg_name_entries(char *arg)
 {
+	int ret = 0;
 	char *str = strdup(arg);
 	if(str == NULL)
-		return -1;
+		return -ENOMEM;
 
 	char *saveptr1 = NULL;
 	char *tok = strtok_r(str,",",&saveptr1);
@@ -34,7 +35,7 @@ int parse_arg_name_entries(char *arg)
 		if(value == NULL)
 		{
 			free(str);
-			return -1;
+			return -EINVAL;
 		}
 
 		if(arg_name_entries == NULL)
@@ -43,14 +44,14 @@ int parse_arg_name_entries(char *arg)
 			if(arg_name_entries == NULL)
 			{
 				free(str);
-				return -1;
+				return -ENOMEM;
 			}
 		}
 
-		if(x509_name_add_entry(arg_name_entries,field,value) < 0)
+		if((ret = x509_name_add_entry(arg_name_entries,field,value)) < 0)
 		{
 			free(str);
-			return -1;
+			return ret;
 		}
 
 		tok = strtok_r(NULL,",",&saveptr1);
@@ -126,15 +127,15 @@ int set_args(int argc, char *argv[])
 				arg_pkcs11_serial = optarg;
 				break;
 			case 'n':
-				if(parse_arg_name_entries(optarg) < 0)
+				if((ret = parse_arg_name_entries(optarg)) < 0)
 				{
 					fprintf(stderr,"malformed name entry\n");
-					return -1;
+					return ret;
 				}
 				break;
 			case 'b':
-				if(parse_arg_basic_constraints(optarg,&arg_basic_constraints) < 0)
-					return -1;
+				if((ret = parse_arg_basic_constraints(optarg,&arg_basic_constraints)) < 0)
+					return ret;
 				break;
 			case 'k':
 				int key_usage_flag = 0;
@@ -163,7 +164,7 @@ int set_args(int argc, char *argv[])
 							fprintf(stderr,"Unknown subject alt name type\n");
 						break;
 					}
-					return -1;
+					return ret;
 				}
 				break;
 			case 'o':
@@ -204,7 +205,7 @@ int set_args(int argc, char *argv[])
 				fprintf(stderr,"Duplicated path attribute\n");
 				break;
 		}
-		return -1;
+		return ret;
 	}
 
 	if(arg_pkcs11_pin)
@@ -214,7 +215,7 @@ int set_args(int argc, char *argv[])
 			pkcs11_uri_free(pkcs11_uri);
 			if(ret == -ENOMEM)
 				fprintf(stderr,"Out of memory\n");
-			return -1;
+			return ret;
 		}
 	}
 	if(arg_pkcs11_serial)
@@ -231,7 +232,7 @@ int set_args(int argc, char *argv[])
 					fprintf(stderr,"Duplicated serial path attribute\n");
 					break;
 			}
-			return -1;
+			return ret;
 		}
 	}
 
@@ -265,7 +266,7 @@ int set_args(int argc, char *argv[])
 					fprintf(stderr,"Duplicated id path attribute\n");
 					break;
 			}
-			return -1;
+			return ret;
 		}
 		free(pkcs11_id_uri_encoded);
 	}
@@ -275,7 +276,7 @@ int set_args(int argc, char *argv[])
 		pkcs11_uri_free(pkcs11_uri);
 		if(ret == -ENOMEM)
 			fprintf(stderr,"Out of memory\n");
-		return -1;
+		return ret;
 	}
 
 	pkcs11_uri_free(pkcs11_uri);
@@ -289,53 +290,66 @@ int main(int argc, char *argv[])
 	X509_REQ *csr = NULL;
 	EVP_PKEY *pubkey = NULL, *privkey = NULL;
 
-	if(set_args(argc,argv) < 0)
-		goto fail;
+	if((ret = set_args(argc,argv)) < 0)
+		goto cleanup;
 
 	if((hsm = hsm_init()) == NULL)
+	{
+		ret = -1;
 		goto openssl_fail;
+	}
 
 	if((csr = csr_new()) == NULL)
+	{
+		ret = -1;
 		goto openssl_fail;
+	}
 
 	if((pubkey = get_pubkey_from_hsm(hsm,arg_pkcs11_uri)) == NULL)
+	{
+		ret = -1;
 		goto openssl_fail;
+	}
 
-	if(set_pubkey_to_csr(csr,pubkey) < 0)
+	if((ret = set_pubkey_to_csr(csr,pubkey)) < 0)
 		goto openssl_fail;
 
 	if(arg_name_entries == NULL)
 	{
 		fprintf(stderr,"Subject name is not set\n");
-		goto fail;
+		ret = -1;
+		goto cleanup;
 	}
-	if(set_subject_name_to_csr(csr,arg_name_entries) < 0)
+	if((ret = set_subject_name_to_csr(csr,arg_name_entries)) < 0)
 		goto openssl_fail;
 
 	if(arg_basic_constraints.ca != -1)
 	{
-		if(request_extension_basic_constraints(csr,arg_basic_constraints) < 0)
+		if((ret = request_extension_basic_constraints(csr,arg_basic_constraints)) < 0)
 			goto openssl_fail;
 	}
 
-	if(arg_key_usage_flag && request_extension_key_usage(csr,arg_key_usage_flag) < 0)
+	if(arg_key_usage_flag && (ret = request_extension_key_usage(csr,arg_key_usage_flag)) < 0)
 		goto openssl_fail;
 
-	if(arg_extended_key_usage_flag && request_extension_extended_key_usage(csr,arg_extended_key_usage_flag) < 0)
+	if(arg_extended_key_usage_flag && (ret = request_extension_extended_key_usage(csr,arg_extended_key_usage_flag)) < 0)
 		goto openssl_fail;
 
-	if(arg_subject_alt_name && request_extension_subject_alt_name(csr,arg_subject_alt_name,arg_subject_alt_name_num) < 0)
+	if(arg_subject_alt_name && (ret = request_extension_subject_alt_name(csr,arg_subject_alt_name,arg_subject_alt_name_num)) < 0)
 		goto openssl_fail;
 
 	if((privkey = get_privkey_from_hsm(hsm,arg_pkcs11_uri)) == NULL)
+	{
+		ret = -1;
 		goto openssl_fail;
+	}
 
-	if(sign_csr(csr,privkey) < 0)
+	if((ret = sign_csr(csr,privkey)) < 0)
 		goto openssl_fail;
 
 	if(arg_output != NULL)
 	{
-		if(export_csr_to_pem_file(arg_output,csr) < 0)
+		if((ret = export_csr_to_pem_file(arg_output,csr)) < 0)
 		{
 			fprintf(stderr,"Export CSR to file failed\n");
 			goto openssl_fail;
@@ -343,7 +357,7 @@ int main(int argc, char *argv[])
 	}
 	else
 	{
-		if(print_csr_pem(csr) < 0)
+		if((ret = print_csr_pem(csr)) < 0)
 		{
 			fprintf(stderr,"CSR PEM print failed\n");
 			goto openssl_fail;
@@ -366,7 +380,5 @@ int main(int argc, char *argv[])
 	return ret;
 	openssl_fail:
 	fprintf(stderr,"openssl error: %s\n",ssl_get_error_string());
-	fail:
-	ret = -1;
 	goto cleanup;
 }
