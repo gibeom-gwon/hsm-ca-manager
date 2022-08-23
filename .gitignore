@@ -4,3 +4,4 @@
 *.csr
 csr_sign
 csr_gen
+hsm_keygen
