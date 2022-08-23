@@ -229,6 +229,114 @@ int append_attribute(CK_ATTRIBUTE **list, CK_ULONG *count, CK_ATTRIBUTE attr)
 	return 0;
 }
 
+int pkcs11_generate_keypair(CK_FUNCTION_LIST *module, CK_SESSION_HANDLE session)
+{
+	int ret = 0;
+	CK_OBJECT_HANDLE public_key, private_key;
+	CK_ULONG bit = 1024;
+	CK_BYTE public_exponent[] = { 0x01,0x00,0x01 };
+	CK_MECHANISM mechanism = {
+		CKM_RSA_PKCS_KEY_PAIR_GEN,
+		0
+	};
+	CK_BBOOL t = CK_TRUE;
+	CK_BBOOL f = CK_FALSE;
+
+	CK_ULONG public_template_attr_count = 0;
+	CK_ULONG private_template_attr_count = 0;
+	CK_ATTRIBUTE *public_template = NULL;
+	CK_ATTRIBUTE *private_template = NULL;
+
+	CK_ATTRIBUTE public_pre_list[] = {
+		{CKA_ENCRYPT,&t,sizeof(t)},
+		{CKA_VERIFY,&t,sizeof(t)},
+	};
+
+	CK_BYTE *id = NULL;
+	CK_ULONG id_len= 0;
+
+	if(arg_pkcs11_id)
+	{
+		if((ret = hexstring_to_list(arg_pkcs11_id,&id)) < 0)
+			return ret;
+		id_len = ret;
+	}
+
+	if((ret = create_attribute_list_from_pre_list(
+						&public_template,
+						&public_template_attr_count,
+						public_pre_list,
+						sizeof(public_pre_list) / sizeof(CK_ATTRIBUTE))) < 0)
+	{
+		return ret;
+	}
+
+	CK_ATTRIBUTE attr = {CKA_MODULUS_BITS,&bit,sizeof(bit)};
+	if((ret = append_attribute(&public_template,&public_template_attr_count,attr)) < 0)
+	{
+		free(public_template);
+		return  ret;
+	}
+
+	attr = (CK_ATTRIBUTE){CKA_PUBLIC_EXPONENT,&public_exponent,sizeof(public_exponent)};
+	if((ret = append_attribute(&public_template,&public_template_attr_count,attr)) < 0)
+	{
+		free(public_template);
+		return  ret;
+	}
+
+	CK_ATTRIBUTE private_pre_list[] = {
+		{CKA_SENSITIVE,&f,sizeof(f)},
+		{CKA_ALWAYS_SENSITIVE,&f,sizeof(f)},
+		{CKA_DECRYPT,&t,sizeof(t)},
+		{CKA_SIGN,&t,sizeof(t)},
+	};
+
+	if((ret = create_attribute_list_from_pre_list(
+						&private_template,
+						&private_template_attr_count,
+						private_pre_list,
+						sizeof(private_pre_list) / sizeof(CK_ATTRIBUTE))) < 0)
+	{
+		free(public_template);
+		return ret;
+	}
+
+	if(id)
+	{
+		attr = (CK_ATTRIBUTE){CKA_ID,id,id_len};
+		if((ret = append_attribute(&private_template,&private_template_attr_count,attr)) < 0)
+		{
+			free(public_template);
+			free(private_template);
+			return  ret;
+		}
+	}
+
+	if((ret = module->C_GenerateKeyPair(
+							session,
+							&mechanism,
+							public_template,
+							public_template_attr_count,
+							private_template,
+							private_template_attr_count,
+							&public_key,
+							&private_key)) != CKR_OK)
+	{
+		fprintf(stderr,"Key pair generation failed %x\n",ret);
+		free(public_template);
+		free(private_template);
+		return -ENOTSUP;
+	}
+
+	if(id)
+		free(id);
+	free(public_template);
+	free(private_template);
+
+	return 0;
+}
+
 int generate_keypair(P11KitUri *uri)
 {
 	int ret = 0;
@@ -267,130 +375,13 @@ int generate_keypair(P11KitUri *uri)
 		return ret;
 	}
 
-	CK_OBJECT_HANDLE public_key, private_key;
-	CK_ULONG bit = 1024;
-	CK_BYTE public_exponent[] = { 0x01,0x00,0x01 };
-	CK_MECHANISM mechanism = {
-		CKM_RSA_PKCS_KEY_PAIR_GEN,
-		0
-	};
-	CK_BBOOL t = CK_TRUE;
-	CK_BBOOL f = CK_FALSE;
-
-	CK_ULONG public_template_attr_count = 0;
-	CK_ULONG private_template_attr_count = 0;
-	CK_ATTRIBUTE *public_template = NULL;
-	CK_ATTRIBUTE *private_template = NULL;
-
-	CK_ATTRIBUTE public_pre_list[] = {
-		{CKA_ENCRYPT,&t,sizeof(t)},
-		{CKA_VERIFY,&t,sizeof(t)},
-	};
-
-	CK_BYTE *id = NULL;
-	CK_ULONG id_len= 0;
-
-	if(arg_pkcs11_id)
-	{
-		if((ret = hexstring_to_list(arg_pkcs11_id,&id)) < 0)
-		{
-			logout(module,session);
-			end_session(module,session);
-			p11_kit_modules_finalize_and_release(modules);
-			return ret;
-		}
-		id_len = ret;
-	}
-
-	if((ret = create_attribute_list_from_pre_list(
-						&public_template,
-						&public_template_attr_count,
-						public_pre_list,
-						sizeof(public_pre_list) / sizeof(CK_ATTRIBUTE))) < 0)
+	if((ret = pkcs11_generate_keypair(module,session)) < 0)
 	{
 		logout(module,session);
 		end_session(module,session);
 		p11_kit_modules_finalize_and_release(modules);
 		return ret;
 	}
-
-	CK_ATTRIBUTE attr = {CKA_MODULUS_BITS,&bit,sizeof(bit)};
-	if((ret = append_attribute(&public_template,&public_template_attr_count,attr)) < 0)
-	{
-		free(public_template);
-		logout(module,session);
-		end_session(module,session);
-		p11_kit_modules_finalize_and_release(modules);
-		return  ret;
-	}
-
-	attr = (CK_ATTRIBUTE){CKA_PUBLIC_EXPONENT,&public_exponent,sizeof(public_exponent)};
-	if((ret = append_attribute(&public_template,&public_template_attr_count,attr)) < 0)
-	{
-		free(public_template);
-		logout(module,session);
-		end_session(module,session);
-		p11_kit_modules_finalize_and_release(modules);
-		return  ret;
-	}
-
-	CK_ATTRIBUTE private_pre_list[] = {
-		{CKA_SENSITIVE,&f,sizeof(f)},
-		{CKA_ALWAYS_SENSITIVE,&f,sizeof(f)},
-		{CKA_DECRYPT,&t,sizeof(t)},
-		{CKA_SIGN,&t,sizeof(t)},
-	};
-
-	if((ret = create_attribute_list_from_pre_list(
-						&private_template,
-						&private_template_attr_count,
-						private_pre_list,
-						sizeof(private_pre_list) / sizeof(CK_ATTRIBUTE))) < 0)
-	{
-		free(public_template);
-		logout(module,session);
-		end_session(module,session);
-		p11_kit_modules_finalize_and_release(modules);
-		return ret;
-	}
-
-	if(id)
-	{
-		attr = (CK_ATTRIBUTE){CKA_ID,id,id_len};
-		if((ret = append_attribute(&private_template,&private_template_attr_count,attr)) < 0)
-		{
-			free(public_template);
-			free(private_template);
-			logout(module,session);
-			end_session(module,session);
-			p11_kit_modules_finalize_and_release(modules);
-			return  ret;
-		}
-	}
-
-	if((ret = module->C_GenerateKeyPair(
-							session,
-							&mechanism,
-							public_template,
-							public_template_attr_count,
-							private_template,
-							private_template_attr_count,
-							&public_key,
-							&private_key)) != CKR_OK)
-	{
-		fprintf(stderr,"Key pair generation failed %x\n",ret);
-		free(public_template);
-		free(private_template);
-		logout(module,session);
-		end_session(module,session);
-		p11_kit_modules_finalize_and_release(modules);
-		return -ENOTSUP;
-	}
-
-	if(id)
-		free(id);
-	free(public_template);
-	free(private_template);
 
 	if((ret = logout(module,session)) < 0)
 	{
