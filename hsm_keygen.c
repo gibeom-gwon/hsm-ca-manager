@@ -11,6 +11,7 @@
 char *arg_pkcs11_uri = NULL;
 const char *arg_pkcs11_pin = NULL;
 const char *arg_pkcs11_serial = NULL;
+const char *arg_pkcs11_id = NULL;
 
 int parse_pkcs11_uri(const char *uri, P11KitUri **out)
 {
@@ -189,6 +190,45 @@ int logout(CK_FUNCTION_LIST *module, CK_SESSION_HANDLE session)
 	return 0;
 }
 
+int create_attribute_list_from_pre_list(CK_ATTRIBUTE **list, CK_ULONG *count, CK_ATTRIBUTE *pre_list, CK_ULONG pre_list_num)
+{
+	if(list == NULL || pre_list == NULL || pre_list_num == 0)
+		return -EFAULT;
+
+	CK_ATTRIBUTE *buff = malloc(sizeof(CK_ATTRIBUTE) * pre_list_num);
+	if(buff == NULL)
+		return -ENOMEM;
+
+	for(*count = 0;*count < pre_list_num;(*count)++)
+		buff[*count] = pre_list[*count];
+
+	*list = buff;
+	return 0;
+}
+
+int append_attribute(CK_ATTRIBUTE **list, CK_ULONG *count, CK_ATTRIBUTE attr)
+{
+	if(list == NULL || count == NULL)
+		return -EFAULT;
+
+	CK_ATTRIBUTE *buff = NULL;
+	if(*list == NULL)
+		buff = malloc(sizeof(CK_ATTRIBUTE));
+	else
+		buff = realloc(*list,sizeof(CK_ATTRIBUTE) * (*count + 1));
+	if(buff == NULL)
+		return -ENOMEM;
+
+	if(*list == NULL)
+		*count = 1;
+	else
+		(*count)++;
+
+	buff[*count - 1] = attr;
+	*list = buff;
+	return 0;
+}
+
 int generate_keypair(P11KitUri *uri)
 {
 	int ret = 0;
@@ -234,38 +274,123 @@ int generate_keypair(P11KitUri *uri)
 		CKM_RSA_PKCS_KEY_PAIR_GEN,
 		0
 	};
-	//CK_BYTE id[] = { 0xd0 };
 	CK_BBOOL t = CK_TRUE;
+	CK_BBOOL f = CK_FALSE;
 
-	CK_ATTRIBUTE public_template[] = {
+	CK_ULONG public_template_attr_count = 0;
+	CK_ULONG private_template_attr_count = 0;
+	CK_ATTRIBUTE *public_template = NULL;
+	CK_ATTRIBUTE *private_template = NULL;
+
+	CK_ATTRIBUTE public_pre_list[] = {
 		{CKA_ENCRYPT,&t,sizeof(t)},
 		{CKA_VERIFY,&t,sizeof(t)},
-		{CKA_MODULUS_BITS,&bit,sizeof(bit)},
-		{CKA_PUBLIC_EXPONENT,&public_exponent,sizeof(bit)},
 	};
-	CK_ATTRIBUTE private_template[] = {
-	//	{CKA_ID,id,sizeof(id)},
-		{CKA_SENSITIVE,&t,sizeof(t)},
+
+	CK_BYTE *id = NULL;
+	CK_ULONG id_len= 0;
+
+	if(arg_pkcs11_id)
+	{
+		if((ret = hexstring_to_list(arg_pkcs11_id,&id)) < 0)
+		{
+			logout(module,session);
+			end_session(module,session);
+			p11_kit_modules_finalize_and_release(modules);
+			return ret;
+		}
+		id_len = ret;
+	}
+
+	if((ret = create_attribute_list_from_pre_list(
+						&public_template,
+						&public_template_attr_count,
+						public_pre_list,
+						sizeof(public_pre_list) / sizeof(CK_ATTRIBUTE))) < 0)
+	{
+		logout(module,session);
+		end_session(module,session);
+		p11_kit_modules_finalize_and_release(modules);
+		return ret;
+	}
+
+	CK_ATTRIBUTE attr = {CKA_MODULUS_BITS,&bit,sizeof(bit)};
+	if((ret = append_attribute(&public_template,&public_template_attr_count,attr)) < 0)
+	{
+		free(public_template);
+		logout(module,session);
+		end_session(module,session);
+		p11_kit_modules_finalize_and_release(modules);
+		return  ret;
+	}
+
+	attr = (CK_ATTRIBUTE){CKA_PUBLIC_EXPONENT,&public_exponent,sizeof(public_exponent)};
+	if((ret = append_attribute(&public_template,&public_template_attr_count,attr)) < 0)
+	{
+		free(public_template);
+		logout(module,session);
+		end_session(module,session);
+		p11_kit_modules_finalize_and_release(modules);
+		return  ret;
+	}
+
+	CK_ATTRIBUTE private_pre_list[] = {
+		{CKA_SENSITIVE,&f,sizeof(f)},
+		{CKA_ALWAYS_SENSITIVE,&f,sizeof(f)},
 		{CKA_DECRYPT,&t,sizeof(t)},
 		{CKA_SIGN,&t,sizeof(t)},
 	};
+
+	if((ret = create_attribute_list_from_pre_list(
+						&private_template,
+						&private_template_attr_count,
+						private_pre_list,
+						sizeof(private_pre_list) / sizeof(CK_ATTRIBUTE))) < 0)
+	{
+		free(public_template);
+		logout(module,session);
+		end_session(module,session);
+		p11_kit_modules_finalize_and_release(modules);
+		return ret;
+	}
+
+	if(id)
+	{
+		attr = (CK_ATTRIBUTE){CKA_ID,id,id_len};
+		if((ret = append_attribute(&private_template,&private_template_attr_count,attr)) < 0)
+		{
+			free(public_template);
+			free(private_template);
+			logout(module,session);
+			end_session(module,session);
+			p11_kit_modules_finalize_and_release(modules);
+			return  ret;
+		}
+	}
 
 	if((ret = module->C_GenerateKeyPair(
 							session,
 							&mechanism,
 							public_template,
-							sizeof(public_template) / sizeof(CK_ATTRIBUTE),
+							public_template_attr_count,
 							private_template,
-							sizeof(private_template) / sizeof(CK_ATTRIBUTE),
+							private_template_attr_count,
 							&public_key,
 							&private_key)) != CKR_OK)
 	{
 		fprintf(stderr,"Key pair generation failed %x\n",ret);
+		free(public_template);
+		free(private_template);
 		logout(module,session);
 		end_session(module,session);
 		p11_kit_modules_finalize_and_release(modules);
 		return -ENOTSUP;
 	}
+
+	if(id)
+		free(id);
+	free(public_template);
+	free(private_template);
 
 	if((ret = logout(module,session)) < 0)
 	{
@@ -306,7 +431,6 @@ int set_args(int argc, char *argv[])
 {
 	int ret = 0;
 	const char *pkcs11_uri_input = NULL;
-	const char *pkcs11_id_hexstring = NULL;
 
 	struct option opts[] = {
 		{"pkcs11-uri",required_argument,0,'p'},
@@ -330,7 +454,7 @@ int set_args(int argc, char *argv[])
 				arg_pkcs11_pin = optarg;
 				break;
 			case 'I':
-				pkcs11_id_hexstring = optarg;
+				arg_pkcs11_id = optarg;
 				break;
 			case 'S':
 				arg_pkcs11_serial = optarg;
@@ -391,14 +515,14 @@ int set_args(int argc, char *argv[])
 		}
 	}
 
-	if(pkcs11_id_hexstring == NULL)
-		pkcs11_id_hexstring = getenv("PKCS11_ID");
+	if(arg_pkcs11_id == NULL)
+		arg_pkcs11_id = getenv("PKCS11_ID");
 
-	if(pkcs11_id_hexstring)
+	if(arg_pkcs11_id)
 	{
-		if(!is_hexstring(pkcs11_id_hexstring))
+		if(!is_hexstring(arg_pkcs11_id))
 		{
-			fprintf(stderr,"Invalid PKCS11 id hexstring\n");
+			fprintf(stderr,"PKCS11 id is not hexstring\n");
 			pkcs11_uri_free(pkcs11_uri);
 			return -1;
 		}
